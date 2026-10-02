@@ -10,7 +10,7 @@ Self-hostable resume evidence review with automated application intake.
 
 [![Watch the short RoleLens demo](docs/demo-assets/cover.png)](docs/demo-assets/rolelens-demo-short.mp4)
 
-[Download the short demo](docs/demo-assets/rolelens-demo-short.mp4) · [Recording guide](docs/demo.md)
+[Download the short demo](docs/demo-assets/rolelens-demo-short.mp4) · [Try the sample workflow](docs/demo.md)
 
 Create a job once, receive applications from an external source or import many resumes together, and let a separate worker extract text and assess explicit role requirements. Reviewers inspect source evidence, correct findings, save notes, and export a review. RoleLens does not rank applicants or make hiring decisions.
 
@@ -71,7 +71,7 @@ Open [localhost:3000](http://localhost:3000). Create a job, enter explicit requi
 
 For scanned PDFs, install Tesseract with English language data (`brew install tesseract` on supported macOS setups, or `sudo apt-get install tesseract-ocr tesseract-ocr-eng` on Debian/Ubuntu). Compose includes it. Text PDFs, DOCX, and TXT do not need the OCR binary. OCR-derived text can contain transcription errors; reviewers should check the original source document.
 
-See the [demo guide](docs/demo.md) for a reproducible 200-PDF recording and the careers-form walkthrough.
+See the [sample walkthrough](docs/demo.md) to try a fictional resume and inspect the product workflow.
 
 ## Configuration
 
