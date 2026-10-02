@@ -4,19 +4,16 @@ import {
   ArrowDownToLine,
   ArrowRight,
   Check,
-  ChevronDown,
   ChevronRight,
   CircleCheck,
   FileText,
   Github,
-  Layers3,
   LoaderCircle,
   PanelLeft,
   Plus,
   Search,
   Settings2,
   ShieldCheck,
-  Sparkles,
   Trash2,
   Upload,
   Users,
@@ -296,24 +293,27 @@ export function ReviewWorkspace() {
 
   return (
     <div className="app-shell">
-      <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
+      <aside id="workspace-navigation" className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <Link className="brand" href="/" aria-label="RoleLens home">
-          <span className="brand-symbol">
-            <Layers3 size={23} strokeWidth={1.8} />
+          <span className="brand-symbol" aria-hidden="true">
+            R
           </span>
-          <span>
-            RoleLens<span className="brand-dot">.</span>
-          </span>
+          <span>RoleLens</span>
         </Link>
-        <div className="workspace-switch">
-          <span className="workspace-icon">R</span>
+        <div className="workspace-context">
+          <span className="workspace-icon">
+            <Users size={16} />
+          </span>
           <div>
-            Review workspace<small>Local development</small>
+            Hiring workspace<small>Local session</small>
           </div>
-          <ChevronDown size={15} />
         </div>
-        <div className="nav-caption">WORKSPACE</div>
-        <button className="nav-item active" onClick={() => setSidebarOpen(false)}>
+        <div className="nav-caption">Workspace</div>
+        <button
+          className="nav-item active"
+          aria-current="page"
+          onClick={() => setSidebarOpen(false)}
+        >
           <Users size={18} />
           Resume review<span className="nav-count">{candidates.length}</span>
         </button>
@@ -323,9 +323,11 @@ export function ReviewWorkspace() {
         </button>
         <div className="sidebar-spacer" />
         <div className="sidebar-note">
-          <ShieldCheck size={21} />
-          <strong>Evidence, then judgment.</strong>
-          <p>Your criteria. Inspectable sources. A human makes the decision.</p>
+          <ShieldCheck size={16} />
+          <div>
+            <strong>Session storage</strong>
+            <p>Export reviews to keep your work before refreshing.</p>
+          </div>
         </div>
         <a
           className="nav-item github-link"
@@ -334,11 +336,10 @@ export function ReviewWorkspace() {
           rel="noreferrer"
         >
           <Github size={18} />
-          Open source
+          GitHub repository
           <ArrowRight size={15} />
         </a>
         <div className="sidebar-footer">
-          <span className="tiny-dot" />
           Development preview<span>v0.1</span>
         </div>
       </aside>
@@ -350,10 +351,12 @@ export function ReviewWorkspace() {
               className="mobile-menu icon-button"
               onClick={() => setSidebarOpen(!sidebarOpen)}
               aria-label="Toggle navigation"
+              aria-expanded={sidebarOpen}
+              aria-controls="workspace-navigation"
             >
               <PanelLeft size={20} />
             </button>
-            Workspace
+            Hiring
             <ChevronRight size={14} />
             <span>Resume review</span>
           </div>
@@ -362,19 +365,14 @@ export function ReviewWorkspace() {
               <span />
               {health ? "API connected" : "API offline"}
             </span>
-            <span className="user-avatar" aria-label="Local reviewer">
-              LR
-            </span>
+            <span className="session-label">Local session</span>
           </div>
         </header>
         <main>
           <div className="page-heading">
             <div>
-              <div className="eyebrow">HIRING WORKSPACE</div>
-              <h1>
-                Every finding has a source<span>.</span>
-              </h1>
-              <p>Review resumes against your role criteria. Keep the hiring decision yours.</p>
+              <h1>Resume review</h1>
+              <p>Compare role requirements with evidence from each resume.</p>
             </div>
             <button
               className="button button-primary"
@@ -390,13 +388,10 @@ export function ReviewWorkspace() {
           </div>
 
           <section className="role-card" aria-label="Current role">
-            <div className="role-icon">
-              <FileText size={23} />
-            </div>
             <div className="role-description">
-              <div className="eyebrow">REVIEWING FOR</div>
+              <div className="eyebrow">Current role</div>
               <h2>{roleTitle}</h2>
-              <span>{requirements.length} requirements · Editable before assessment</span>
+              <span>{requirements.length} requirements</span>
             </div>
             <button className="button button-secondary" onClick={editCriteria} disabled={busy}>
               <Settings2 size={15} />
@@ -406,35 +401,26 @@ export function ReviewWorkspace() {
 
           <div className="overview">
             <div>
-              <span className="stat-label">Resumes in this session</span>
-              <strong>
-                {candidates.length.toString().padStart(2, "0")}
-                <Users size={18} />
-              </strong>
+              <Users size={15} />
+              <strong>{candidates.length}</strong>
+              <span className="stat-label">resumes</span>
             </div>
             <div>
-              <span className="stat-label">Evidence assessments</span>
-              <strong>
-                {assessedCount.toString().padStart(2, "0")}
-                <FileText size={18} />
-              </strong>
+              <FileText size={15} />
+              <strong>{assessedCount}</strong>
+              <span className="stat-label">assessed</span>
             </div>
             <div>
-              <span className="stat-label">Reviewed by you</span>
-              <strong>
-                {reviewedCount.toString().padStart(2, "0")}
-                <CircleCheck size={18} />
-              </strong>
+              <CircleCheck size={15} />
+              <strong>{reviewedCount}</strong>
+              <span className="stat-label">reviewed</span>
             </div>
           </div>
 
           {sampleMode && (
             <div className="sample-banner">
-              <Sparkles size={17} />
-              <span>
-                <strong>Sample workspace</strong> · Invented resumes and preset findings. Samples
-                make no AI calls.
-              </span>
+              <span className="sample-tag">Demo data</span>
+              <span>Invented resumes and preset findings. Samples make no AI calls.</span>
               <button
                 onClick={() => {
                   setCandidates((current) =>
@@ -491,9 +477,7 @@ export function ReviewWorkspace() {
           )}
 
           <div className="section-heading">
-            <h2>
-              Resume review <span>{candidates.length}</span>
-            </h2>
+            <h2>Review workspace</h2>
             <button
               className="text-button"
               onClick={() => {
@@ -513,6 +497,10 @@ export function ReviewWorkspace() {
           </div>
           <div className="review-grid">
             <section className="candidate-panel" aria-label="Resumes">
+              <div className="candidate-panel-heading">
+                <h3>Resumes</h3>
+                <span>{candidates.length}</span>
+              </div>
               <label className="search-field">
                 <Search size={16} />
                 <input
@@ -533,6 +521,7 @@ export function ReviewWorkspace() {
                     <button
                       key={candidate.id}
                       className={`candidate-item ${candidate.id === selectedId ? "selected" : ""}`}
+                      aria-pressed={candidate.id === selectedId}
                       onClick={() => {
                         setSelectedId(candidate.id);
                         setNotice("");
@@ -605,8 +594,8 @@ export function ReviewWorkspace() {
                   </div>
                   <div className="review-tabs">
                     <span className="tab-active">
-                      <Layers3 size={15} />
-                      Requirement evidence
+                      Requirements
+                      <span className="tab-count">{requirements.length}</span>
                     </span>
                     <span className="assessment-label">
                       {selected.assessment?.is_sample
@@ -619,8 +608,8 @@ export function ReviewWorkspace() {
                   <div className="evidence-layout">
                     <div className="findings-panel">
                       <div className="table-label">
-                        <span>ROLE REQUIREMENT</span>
-                        <span>FINDING</span>
+                        <span>Requirement</span>
+                        <span>Finding</span>
                       </div>
                       {requirements.map((requirement, index) => {
                         const result = selected.assessment?.findings.find(
@@ -630,6 +619,7 @@ export function ReviewWorkspace() {
                           <button
                             key={requirement.id}
                             className={`finding-row ${selectedRequirement === requirement.id ? "finding-selected" : ""}`}
+                            aria-pressed={selectedRequirement === requirement.id}
                             onClick={() => setSelectedRequirement(requirement.id)}
                           >
                             <span className="requirement-index">
@@ -657,20 +647,24 @@ export function ReviewWorkspace() {
                         {busy ? (
                           <LoaderCircle className="spin" size={16} />
                         ) : (
-                          <Sparkles size={16} />
+                          <FileText size={16} />
                         )}
                         {busy
                           ? "Assessing evidence…"
                           : selected.assessment
-                            ? "Reassess with Jev"
-                            : "Assess with Jev"}
+                            ? "Reassess evidence"
+                            : "Assess evidence"}
                       </button>
                     </div>
                     <aside className="source-panel">
                       <div className="source-heading">
-                        <FileText size={15} />
+                        <FileText size={16} />
                         <h3>Source evidence</h3>
                         <span>{finding?.evidence ? "Linked" : "Preview"}</span>
+                      </div>
+                      <div className="source-requirement">
+                        <span>Selected requirement</span>
+                        <p>{requirements.find((item) => item.id === selectedRequirement)?.text}</p>
                       </div>
                       <p className="source-caption">
                         {finding?.evidence
@@ -734,7 +728,7 @@ export function ReviewWorkspace() {
                   <div className="empty-icon">
                     <FileText size={30} />
                   </div>
-                  <h2>A clearer way to review.</h2>
+                  <h2>No resume selected</h2>
                   <p>
                     Add a resume and check the extracted text, or explore the sample workspace to
                     see how evidence review works.
@@ -755,8 +749,8 @@ export function ReviewWorkspace() {
             </section>
           </div>
           <footer className="page-footer">
-            <span>RoleLens · Open source, built for inspectable review.</span>
-            <span>Findings support your review. They do not decide who gets hired.</span>
+            <span>RoleLens / Development preview</span>
+            <span>Evidence supports review. Hiring decisions remain with you.</span>
           </footer>
         </main>
       </div>
