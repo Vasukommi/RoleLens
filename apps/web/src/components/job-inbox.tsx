@@ -379,7 +379,7 @@ export function JobInbox({ section = "library" }: { section?: WorkspaceSection }
               {section === "jobs"
                 ? "Create roles and define the criteria used to assess incoming resumes."
                 : section === "shortlists"
-                  ? "Automatic evidence matching, comparison, and approved shortlist exports."
+                  ? "Automatic screening and shortlist downloads. Adjust the matching rules at any time."
                   : section === "exports"
                     ? "Download saved application reviews and their supporting evidence."
                     : "Import and inspect resumes for this job. PDF, DOCX, and TXT are supported."}

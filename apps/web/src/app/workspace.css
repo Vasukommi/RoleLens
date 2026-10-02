@@ -1918,7 +1918,7 @@ dialog::backdrop {
   max-height: 90vh;
   overflow: auto;
   padding: 28px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 12px;
 }
 .comparison-review-dialog::backdrop {
@@ -1929,12 +1929,12 @@ dialog::backdrop {
   line-height: 1.7;
 }
 .comparison-review-record {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--line);
   margin-top: 24px;
   padding-top: 16px;
 }
 .comparison-finding {
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--line);
   padding: 14px 0;
 }
 .comparison-finding summary {
@@ -1956,7 +1956,7 @@ dialog::backdrop {
   background: var(--surface);
   font-size: 12px;
   line-height: 1.7;
-  border-left: 2px solid var(--border);
+  border-left: 2px solid var(--line);
 }
 @media (max-width: 700px) {
   .comparison-toolbar > * {
@@ -1995,5 +1995,37 @@ dialog::backdrop {
 @media (max-width: 700px) {
   .inbox-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.screening-policy {
+  margin: 20px 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.screening-policy p {
+  margin: 12px 0;
+}
+.screening-policy summary {
+  cursor: pointer;
+}
+.screening-policy-editor {
+  margin-top: 18px;
+}
+.screening-policy-editor .form-input {
+  max-width: 160px;
+}
+.screening-policy-criterion {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+@media (max-width: 640px) {
+  .screening-policy .interpretation-heading {
+    flex-wrap: wrap;
+    gap: 12px;
   }
 }

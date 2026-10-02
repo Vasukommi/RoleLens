@@ -33,7 +33,6 @@ export function CreateJobDialog({
   const [draft, setDraft] = useState<JobInterpretation | null>(null);
   const [requirements, setRequirements] = useState<JobRequirement[]>([]);
   const [excluded, setExcluded] = useState<string[]>([]);
-  const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -44,11 +43,10 @@ export function CreateJobDialog({
 
   function invalidate() {
     setDraft(null);
-    setConfirmed(false);
     setError("");
   }
 
-  async function analyze() {
+  async function analyze(createAutomatically = false) {
     if (!title.trim() || description.trim().length < 30) {
       setError("Enter a title and a job description of at least 30 characters.");
       return;
@@ -64,17 +62,16 @@ export function CreateJobDialog({
         signal: controller.current.signal,
       });
       setDraft(result);
-      setRequirements(
-        result.requirements.map((item) => ({
-          ...item,
-          assessment_mode:
-            item.assessment_mode === "RESUME_EVIDENCE" && result.validation[item.id] !== "GROUNDED"
-              ? "VERIFY_SEPARATELY"
-              : item.assessment_mode,
-        })),
-      );
+      const proposed = result.requirements.map((item) => ({
+        ...item,
+        assessment_mode:
+          item.assessment_mode === "RESUME_EVIDENCE" && result.validation[item.id] !== "GROUNDED"
+            ? ("VERIFY_SEPARATELY" as const)
+            : item.assessment_mode,
+      }));
+      setRequirements(proposed);
       setExcluded([]);
-      setConfirmed(false);
+      if (createAutomatically) await create(result, proposed);
     } catch (failure) {
       if ((failure as Error).name !== "AbortError") setError((failure as Error).message);
     } finally {
@@ -86,17 +83,18 @@ export function CreateJobDialog({
     setRequirements((current) =>
       current.map((item) => (item.id === id ? { ...item, ...changes } : item)),
     );
-    setConfirmed(false);
   }
 
-  async function create() {
+  async function create(source = draft, proposed = requirements) {
     const selected = manual
       ? manualCriteria
           .split("\n")
           .map((text) => text.trim())
           .filter(Boolean)
-          .map((text, index) => ({ id: `r${index + 1}`, text }))
-      : requirements.filter((item) => !excluded.includes(item.id));
+          .map((text, index) => ({ id: `r${index + 1}`, text, priority: "REQUIRED" as const }))
+      : source !== draft
+        ? proposed
+        : proposed.filter((item) => !excluded.includes(item.id));
     if (
       !title.trim() ||
       selected.length < 1 ||
@@ -106,8 +104,8 @@ export function CreateJobDialog({
       setError("Enter a title and 1–32 criteria, 3–300 characters each.");
       return;
     }
-    if (!manual && (!draft || !confirmed)) {
-      setError("Review and confirm the extracted criteria before creating the job.");
+    if (!manual && !source) {
+      setError("Analyze the description before creating the job.");
       return;
     }
     setBusy(true);
@@ -120,9 +118,7 @@ export function CreateJobDialog({
         body: JSON.stringify({
           title: title.trim(),
           requirements: selected,
-          ...(!manual && draft
-            ? { interpretation_id: draft.id, interpretation_reviewed: true }
-            : {}),
+          ...(!manual && source ? { interpretation_id: source.id } : {}),
         }),
         signal: controller.current.signal,
       });
@@ -154,8 +150,8 @@ export function CreateJobDialog({
         {manual
           ? "Enter your own assessment criteria. These are saved as employer-authored requirements."
           : draft
-            ? "Review the interpretation once. These criteria will be used consistently across incoming resumes."
-            : "Paste the description you already use. We will extract criteria and flag details that need clarification."}
+            ? "Adjust these criteria if needed. Matching and shortlisting run automatically."
+            : "Paste your job description. We will prepare screening criteria automatically; resumes qualify when all selected criteria are supported."}
       </p>
       <label className="form-label" htmlFor="job-name">
         Job title
@@ -217,7 +213,8 @@ export function CreateJobDialog({
               </div>
               <p>
                 Priority stays “Not specified” when the description does not say required or
-                preferred. Confirm it here if needed.
+                preferred. Unspecified criteria count toward the default screening rules; change
+                priorities if needed.
               </p>
               {draft.review_notes.length > 0 && (
                 <div className="interpretation-notes">
@@ -244,7 +241,6 @@ export function CreateJobDialog({
                               ? current.filter((id) => id !== item.id)
                               : [...current, item.id],
                           );
-                          setConfirmed(false);
                         }}
                       />
                       Criterion {index + 1}
@@ -291,18 +287,10 @@ export function CreateJobDialog({
                   </details>
                 </article>
               ))}
-              <label className="interpretation-confirm">
-                <input
-                  type="checkbox"
-                  checked={confirmed}
-                  disabled={busy}
-                  onChange={(event) => setConfirmed(event.target.checked)}
-                />
-                I have reviewed the criteria, priorities, and verification notes.
-              </label>
               <p className="description-data-note">
-                Job criteria are fixed after creation. Interview and verification items remain
-                unclear in resume assessments. Hiring decisions stay with your team.
+                The default threshold is 100% of required and unspecified criteria. Preferred and
+                interview-only criteria are excluded from selection by default. Unverified source
+                interpretations remain unresolved. You can adjust screening rules in Shortlists.
               </p>
             </section>
           )}
@@ -325,16 +313,25 @@ export function CreateJobDialog({
         >
           {manual ? "Use a job description" : "Enter criteria manually"}
         </button>
+        {!manual && !draft && (
+          <button
+            className="button button-secondary"
+            disabled={busy}
+            onClick={() => void analyze()}
+          >
+            Preview criteria
+          </button>
+        )}
         <button className="button button-secondary" disabled={busy} onClick={onClose}>
           Cancel
         </button>
         <button
           className="button button-primary"
-          disabled={busy || (!manual && draft !== null && !confirmed)}
-          onClick={() => void (manual || draft ? create() : analyze())}
+          disabled={busy}
+          onClick={() => void (manual || draft ? create() : analyze(true))}
         >
           {busy && <LoaderCircle size={15} className="spin" />}
-          {manual || draft ? "Create job" : "Analyze description"}
+          Create job
         </button>
       </div>
     </dialog>

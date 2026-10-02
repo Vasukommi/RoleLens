@@ -24,6 +24,7 @@ class Requirement(BaseModel):
     assessment_mode: Literal["RESUME_EVIDENCE", "VERIFY_SEPARATELY", "INTERVIEW"] = (
         "RESUME_EVIDENCE"
     )
+    source_validation: Literal["GROUNDED", "REVIEW", "EMPLOYER_AUTHORED"] = "EMPLOYER_AUTHORED"
     source_quote: str | None = Field(default=None, min_length=1, max_length=2000)
     review_note: str | None = Field(default=None, max_length=600)
     components: list[str] = Field(default_factory=list, max_length=8)
@@ -35,6 +36,19 @@ class Requirement(BaseModel):
         if any(not 3 <= len(v) <= 300 for v in values):
             raise ValueError("Components must be 3–300 characters each.")
         return values
+
+
+class ScreeningPolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    threshold: int = Field(default=100, ge=1, le=100, strict=True)
+    criterion_ids: list[str] = Field(max_length=MAX_REQUIREMENTS)
+
+    @field_validator("criterion_ids")
+    @classmethod
+    def unique_criteria(cls, items):
+        if len(set(items)) != len(items):
+            raise ValueError("Choose each criterion only once.")
+        return items
 
 
 class Passage(BaseModel):

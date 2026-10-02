@@ -2,7 +2,7 @@
 
 Scanned and hybrid PDFs use local English OCR for pages with fewer than 30 extracted characters. PDFium renders each page within a six-million-pixel budget, and Tesseract reads the rendered image. Each OCR subprocess has a 25-second timeout and the document has a 120-second elapsed-time budget checked around page processing. Native rendering is not a separately sandboxed process. The worker renews its lease during extraction. Missing OCR software or unusable scans fail visibly instead of producing invented text.
 
-Extraction provenance is stored as `native`, `ocr`, or `mixed`; reviewers see a notice for OCR-derived text. Evidence passages are substrings of the extracted text, which may contain OCR errors. Original upload bytes are cleared after extraction in this version, so verifying transcription requires retaining the original document in the source system. No OCR accuracy claim or automatic hiring decision follows from this extraction.
+Extraction provenance is stored as `native`, `ocr`, or `mixed`; reviewers see a notice for OCR-derived text. Evidence passages are substrings of the extracted text, which may contain OCR errors. Original upload bytes are retained for downloads; the separate queue payload is cleared after extraction. Automatic shortlist selection uses the subsequent evidence findings and configured screening rules.
 
 ```text
 Careers site / future source adapter ── authenticated intake API ──┐
@@ -44,7 +44,7 @@ The implementation uses SQLAlchemy's [DML/RETURNING support](https://docs.sqlalc
 
 ## Evidence and saved reviews
 
-Job creation can first interpret an ordinary JD through OpenAI Structured Outputs, source checks, optional Jev verification, and a review/confirmation step. A separate server token and per-process request bounds protect this paid endpoint within the local deployment boundary. Successful interpretations are cached in `job_interpretations`; jobs store the description and an immutable proposed/approved snapshot. See [job-description interpretation](job-descriptions.md) for model choice, prompt rules, exclusions, and limitations. Candidate resumes are not sent to OpenAI by this flow.
+Job creation can first interpret an ordinary JD through OpenAI Structured Outputs, source checks, optional Jev verification, and automatic job creation with optional criterion preview. A separate server token and per-process request bounds protect this paid endpoint within the local deployment boundary. Successful interpretations are cached in `job_interpretations`; jobs store the description and an immutable proposed/approved snapshot. See [job-description interpretation](job-descriptions.md) for model choice, prompt rules, exclusions, and limitations. Candidate resumes are not sent to OpenAI by this flow.
 
 Jobs contain fixed criteria for this version. Code retrieves multiple source passages per component; Jev classifies their evidence using closed-set questions. Code combines ALL/ANY components and calculates conservative non-overlapping dated experience. See [automatic matching](automated-matching.md) for the workflow, research, and limits. Response choices/distributions are checked, IDs resolve to verbatim text, and low confidence or irrelevant evidence retains uncertainty. The model does not rank candidates or decide hiring outcomes.
 
@@ -58,7 +58,7 @@ Pending/failed source bytes, extracted text, source IDs, original assessments, a
 
 PDFs are limited to twenty pages, DOCX unpacked content to 15 MB, and extracted text to 24,000 characters. Encrypted PDFs and documents with unusable extracted/OCR text fail clearly. Multipart uploads may spool to temporary disk before acceptance. Application logs exclude source text, credentials, and provider response bodies.
 
-Live inference sends passages and requirements to TypeSafe. Self-hosting the app does not imply local inference, residency guarantees, or control over the hosted provider's retention. Verify provider arrangements separately. The frontend-only workspace at `/demo` contains 200 fictional profiles and deterministic preset comparisons. It makes no backend or hosted inference calls. Demo selections reset on reload, and exports identify the sample provenance. Its folders preview the planned cross-job workflow; live matching and approved shortlists operate within jobs.
+Live inference sends passages and requirements to TypeSafe. Self-hosting the app does not imply local inference, residency guarantees, or control over the hosted provider's retention. Verify provider arrangements separately. The frontend-only workspace at `/demo` contains 200 fictional profiles and deterministic preset comparisons. It makes no backend or hosted inference calls. Demo selections reset on reload, and exports identify the sample provenance. Its folders preview the planned cross-job workflow; live matching and automatic shortlists operate within jobs.
 
 ## Current deployment boundary
 

@@ -22,7 +22,8 @@ const INBOX_ROUTES = [
   { path: new RegExp(`^applications/${ID}/review$`), methods: ["PATCH"] },
   { path: new RegExp(`^applications/${ID}/retry$`), methods: ["POST"] },
   { path: new RegExp(`^jobs/${ID}/comparison$`), methods: ["GET"] },
-  { path: new RegExp(`^jobs/${ID}/shortlist$`), methods: ["POST"] },
+  { path: new RegExp(`^jobs/${ID}/screening-policy$`), methods: ["PATCH"] },
+  { path: new RegExp(`^jobs/${ID}/shortlist/csv$`), methods: ["GET"] },
   { path: new RegExp(`^jobs/${ID}/reassess$`), methods: ["POST"] },
   { path: new RegExp(`^jobs/${ID}/shortlist/documents$`), methods: ["GET"] },
   { path: new RegExp(`^applications/${ID}/document$`), methods: ["GET"] },
@@ -39,7 +40,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   }
   const protectedWorkspaceRequest =
     route === "job-interpretations" ||
-    /\/(?:comparison|shortlist|reassess|document|shortlist\/documents)$/.test(route);
+    /\/(?:comparison|screening-policy|reassess|document|shortlist\/(?:documents|csv))$/.test(route);
   if (protectedWorkspaceRequest) {
     const origin = request.headers.get("origin");
     // Next.js can normalize nextUrl.hostname to localhost in development. Compare the

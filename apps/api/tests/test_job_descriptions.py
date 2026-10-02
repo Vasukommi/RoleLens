@@ -342,8 +342,10 @@ def test_authentication_cache_and_immutable_job_snapshot(client):
         "requirements": first.json()["requirements"],
         "interpretation_id": first.json()["id"],
     }
-    assert client.post("/api/v1/jobs", json=payload).status_code == 422
-    payload["interpretation_reviewed"] = True
+    automatic = client.post("/api/v1/jobs", json=payload)
+    assert automatic.status_code == 201
+    assert automatic.json()["interpretation"]["reviewed"] is False
+    assert automatic.json()["screening_policy"]["threshold"] == 100
     payload["requirements"][0]["source_quote"] = "forged quote"
     payload["requirements"][0]["components"] = ["Forged Python experience"]
     payload["requirements"][0]["component_operator"] = "ANY"

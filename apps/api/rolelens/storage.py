@@ -21,18 +21,24 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     and_,
+    case,
     create_engine,
     delete,
     event,
     false,
     func,
     insert,
+    literal,
     or_,
     select,
     update,
 )
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
+
+from rolelens.decisions import default_policy, selection
+from rolelens.matching import PROTOCOL
+from rolelens.schemas import ScreeningPolicy
 
 metadata = MetaData()
 jobs = Table(
@@ -43,6 +49,8 @@ jobs = Table(
     Column("requirements", JSON, nullable=False),
     Column("description", Text),
     Column("interpretation", JSON),
+    Column("screening_policy", JSON),
+    Column("policy_version", Integer, nullable=False, server_default="1"),
     Column("created_at", Float, nullable=False),
 )
 job_interpretations = Table(
@@ -154,6 +162,8 @@ class Store:
             "requirements": requirements,
             "description": description,
             "interpretation": interpretation,
+            "screening_policy": default_policy(requirements),
+            "policy_version": 1,
             "created_at": time.time(),
         }
         with self.engine.begin() as connection:
@@ -205,19 +215,62 @@ class Store:
 
     def list_jobs(self) -> list[dict]:
         with self.engine.connect() as connection:
-            return [
+            rows = [
                 dict(row)
                 for row in connection.execute(
                     select(jobs).order_by(jobs.c.created_at.desc())
                 ).mappings()
             ]
+        for row in rows:
+            row["screening_policy"] = row["screening_policy"] or default_policy(row["requirements"])
+        return rows
 
     def job(self, job_id: str) -> dict:
         with self.engine.connect() as connection:
             row = connection.execute(select(jobs).where(jobs.c.id == job_id)).mappings().first()
         if row is None:
             raise KeyError("Job not found.")
-        return dict(row)
+        data = dict(row)
+        data["screening_policy"] = data["screening_policy"] or default_policy(data["requirements"])
+        return data
+
+    def update_policy(self, job_id: str, policy: ScreeningPolicy, version: int) -> dict:
+        job = self.job(job_id)
+        if not set(policy.criterion_ids) <= {r["id"] for r in job["requirements"]}:
+            raise IntakeConflict("A screening criterion does not belong to this job.")
+        with self.engine.begin() as connection:
+            result = connection.execute(
+                update(jobs)
+                .where(jobs.c.id == job_id, jobs.c.policy_version == version)
+                .values(
+                    screening_policy=policy.model_dump(), policy_version=jobs.c.policy_version + 1
+                )
+            )
+            if result.rowcount != 1:
+                raise IntakeConflict("Screening rules changed. Reload before saving.")
+        return self.job(job_id)
+
+    @staticmethod
+    def shortlist_condition(policy: dict):
+        # Evaluate the current policy in SQL: no resume reads, bulk rewrites, or model calls.
+        ids = policy["criterion_ids"]
+        supported = sum(
+            (
+                case(
+                    (applications.c.screening["findings"][key].as_string() == "SUPPORTED", 1),
+                    else_=0,
+                )
+                for key in ids
+            ),
+            literal(0),
+        )
+        return and_(
+            applications.c.status == "READY",
+            applications.c.screening["protocol"].as_string() == PROTOCOL,
+            func.coalesce(applications.c.screening["is_sample"].as_boolean(), False).is_(False),
+            literal(len(ids)) > 0,
+            supported * 100 >= policy["threshold"] * len(ids),
+        )
 
     def create_batch(self, job_id: str, expected: int) -> dict:
         self.job(job_id)
@@ -440,6 +493,9 @@ class Store:
             "lease_until",
         ):
             data.pop(key)
+        job = self.job(data["job_id"])
+        data["selection"] = selection(data["screening"], data["status"], job["screening_policy"])
+        data["shortlisted"] = data["selection"]["status"] == "SHORTLISTED"
         return data
 
     def save_review(
@@ -586,6 +642,8 @@ class Store:
         from rolelens.comparison import evidence_summary
 
         job = self.job(job_id)
+        policy = job["screening_policy"]
+        qualifies = self.shortlist_condition(policy)
         where = [applications.c.job_id == job_id]
         if criterion_id:
             if criterion_id not in {r["id"] for r in job["requirements"]}:
@@ -596,7 +654,7 @@ class Store:
         if search:
             where.append(func.lower(applications.c.name).contains(search.lower(), autoescape=True))
         if scope == "SHORTLISTED":
-            where.append(applications.c.shortlisted.is_(True))
+            where.append(qualifies)
         elif scope == "COMPLETE":
             where.append(applications.c.screening["required_complete"].as_boolean().is_(True))
         elif scope == "UNRESOLVED":
@@ -612,8 +670,6 @@ class Store:
                 "version",
                 "shortlisted",
                 "screening",
-                "assessment",
-                "overrides",
             )
         ]
         with self.engine.connect() as c:
@@ -639,14 +695,14 @@ class Store:
             selected = c.scalar(
                 select(func.count())
                 .select_from(applications)
-                .where(applications.c.job_id == job_id, applications.c.shortlisted.is_(True))
+                .where(applications.c.job_id == job_id, qualifies)
             )
         items = []
         for row in rows:
             item = dict(row)
-            item["screening"] = evidence_summary(
-                job["requirements"], item.pop("assessment"), item.pop("overrides")
-            )
+            item["screening"] = item["screening"] or evidence_summary(job["requirements"], None)
+            item["selection"] = selection(item["screening"], item["status"], policy)
+            item["shortlisted"] = item["selection"]["status"] == "SHORTLISTED"
             items.append(item)
         return {
             "items": items,
@@ -655,50 +711,9 @@ class Store:
             "limit": limit,
             "statuses": counts,
             "shortlisted": selected,
+            "screening_policy": policy,
+            "policy_version": job["policy_version"],
         }
-
-    def approve_shortlist(self, job_id: str, selections: list[dict]):
-        from rolelens.matching import PROTOCOL
-
-        self.job(job_id)
-        with self.engine.begin() as c:
-            for choice in selections:
-                row = (
-                    c.execute(
-                        select(applications).where(
-                            applications.c.id == choice["id"], applications.c.job_id == job_id
-                        )
-                    )
-                    .mappings()
-                    .first()
-                )
-                if row is None or row["status"] != "READY" or row["version"] != choice["version"]:
-                    raise IntakeConflict(
-                        "A selected assessment changed or is unavailable. Refresh before approving."
-                    )
-                if not row["assessment"] or row["assessment"].get("protocol") != PROTOCOL:
-                    raise IntakeConflict("Refresh matching before approving an older assessment.")
-                updated = c.execute(
-                    update(applications)
-                    .where(
-                        applications.c.id == choice["id"],
-                        applications.c.version == choice["version"],
-                        applications.c.status == "READY",
-                    )
-                    .values(
-                        shortlisted=True,
-                        shortlist_approval={
-                            "assessment_version": choice["version"],
-                            "approved_at": time.time(),
-                            "evidence_reviewed": True,
-                        },
-                        version=applications.c.version + 1,
-                        updated_at=time.time(),
-                    )
-                ).rowcount
-                if updated != 1:
-                    raise IntakeConflict("Assessment changed. Refresh before approving.")
-        return {"approved": len(selections)}
 
     def reassess(self, job_id: str):
         self.job(job_id)
@@ -770,14 +785,29 @@ class Store:
             raise KeyError("Original document unavailable.")
         return row.filename, row.original_document
 
+    def shortlist_rows(self, job_id: str, policy: dict):
+        statement = (
+            select(
+                applications.c.name,
+                applications.c.filename,
+                applications.c.screening,
+            )
+            .where(applications.c.job_id == job_id, self.shortlist_condition(policy))
+            .order_by(applications.c.created_at, applications.c.id)
+        )
+        with self.engine.connect() as connection:
+            for row in connection.execution_options(yield_per=100).execute(statement).mappings():
+                yield dict(row)
+
     def shortlist_documents(self, job_id: str):
-        self.job(job_id)
+        policy = self.job(job_id)["screening_policy"]
+        qualifies = self.shortlist_condition(policy)
         with self.engine.connect() as c:
             sizes = c.execute(
                 select(
                     applications.c.id, func.length(applications.c.original_document).label("size")
                 )
-                .where(applications.c.job_id == job_id, applications.c.shortlisted.is_(True))
+                .where(applications.c.job_id == job_id, qualifies)
                 .limit(101)
             ).all()
             if len(sizes) > 100:
