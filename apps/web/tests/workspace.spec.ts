@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("sample review links evidence, retains notes, and exports provenance", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/demo");
   await expect(page.getByText("API connected")).toBeVisible();
   await expect(
     page.getByText("Invented resumes and preset findings.", { exact: false }),
@@ -21,7 +21,7 @@ test("sample review links evidence, retains notes, and exports provenance", asyn
 });
 
 test("edited criteria invalidate prior assessments", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/demo");
   await expect(page.getByRole("heading", { name: "Maya Chen", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Edit criteria", exact: true }).click();
   await page.getByLabel("Role title").fill("Backend Engineer");
@@ -37,7 +37,7 @@ test("edited criteria invalidate prior assessments", async ({ page }) => {
 });
 
 test("real document upload previews text without a fake assessment", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/demo");
   await expect(page.getByText("API connected")).toBeVisible();
   await page.getByRole("button", { name: "Add resume", exact: true }).click();
   await page.locator('input[type="file"]').setInputFiles({
@@ -57,7 +57,7 @@ test("real document upload previews text without a fake assessment", async ({ pa
 
 test("mobile workspace has no horizontal overflow", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/demo");
   await expect(page.getByRole("heading", { name: "Maya Chen", exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,

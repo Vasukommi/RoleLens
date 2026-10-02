@@ -1,5 +1,4 @@
-import { ReviewWorkspace } from "@/components/review-workspace";
-
-export default function Home() {
-  return <ReviewWorkspace />;
+import { JobInbox } from "@/components/job-inbox";
+export default function Page() {
+  return <JobInbox />;
 }

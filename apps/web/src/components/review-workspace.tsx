@@ -297,7 +297,7 @@ export function ReviewWorkspace() {
     <div className="app-shell">
       <aside id="workspace-navigation" className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <Link className="brand" href="/" aria-label="RoleLens home">
-          <Image src={wordmark} alt="RoleLens" width={176} height={59} loading="eager" />
+          <Image src={wordmark} alt="RoleLens" sizes="176px" loading="eager" />
         </Link>
         <div className="workspace-context">
           <span className="workspace-icon">
