@@ -17,6 +17,7 @@ Create a job once, receive applications from an external source or import many r
 - An authenticated text/file intake API with source IDs and status receipts.
 - A [runnable careers-form integration](docs/integrations.md). Named ATS connectors are not implemented yet.
 - A database-backed worker with expiring leases, restart recovery, provider backoff, and bounded retry attempts.
+- Local English OCR for scanned PDFs, with extraction provenance shown to reviewers.
 - Server-side search, status filters, and 50-row pagination; resume text loads only when selected.
 - Original model findings stored separately from reviewer corrections, with stale-write protection.
 - PostgreSQL and migrations in Compose; SQLite for local development.
@@ -63,6 +64,10 @@ npm run dev
 ```
 
 Open [localhost:3000](http://localhost:3000). Create a job, enter explicit requirements, then select multiple PDF/DOCX/TXT files with **Import resumes**. Accepted applications are durable; keep the tab open until all file uploads complete. Parsed documents wait for provider configuration when no Jev key exists. API documentation: [localhost:8000/docs](http://localhost:8000/docs).
+
+For scanned PDFs, install Tesseract with English language data (`brew install tesseract` on supported macOS setups, or `sudo apt-get install tesseract-ocr tesseract-ocr-eng` on Debian/Ubuntu). Compose includes it. Text PDFs, DOCX, and TXT do not need the OCR binary. OCR-derived text can contain transcription errors; reviewers should check the original source document.
+
+See the [demo guide](docs/demo.md) for a reproducible 200-PDF recording and the careers-form walkthrough.
 
 ## Configuration
 
