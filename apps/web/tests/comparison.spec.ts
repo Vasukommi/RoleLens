@@ -29,7 +29,10 @@ test("automatic comparison supports filtering, reviewed approval, and original e
   const documents = page.waitForEvent("download");
   await page.getByRole("button", { name: "Shortlisted resumes", exact: true }).click();
   expect((await documents).suggestedFilename()).toMatch(/\.zip$/);
-  await page.screenshot({ path: "../../docs/images/evidence-comparison.png", fullPage: true });
+  await page.screenshot({
+    path: test.info().outputPath("evidence-comparison.png"),
+    fullPage: true,
+  });
 });
 
 test("matching results remain usable on a narrow screen", async ({ page, request }) => {
