@@ -26,6 +26,33 @@ with tempfile.TemporaryDirectory(prefix="rolelens-browser-") as directory:
     subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"], env=environment, check=True
     )
+    # A completed fictional assessment exercises reviewer controls without hosted model calls.
+    subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            """
+from rolelens.storage import Store
+from rolelens.schemas import Assessment, Finding, Passage
+from rolelens.config import Settings
+store = Store(Settings().database_url)
+text = 'Fictional browser fixture. Built Python APIs with FastAPI and background jobs.'
+job = store.create_job('Dropdown review fixture', [{'id': 'python', 'text': 'Built Python APIs'}])
+receipt = store.accept(job['id'], 'Dropdown Test Applicant', 'fictional.txt', text=text,
+                       source='synthetic_fixture', external_id='dropdown-review')
+row = store.claim(False, 90)
+assert row['id'] == receipt['id']
+assessment = Assessment(model='synthetic-browser-fixture', is_sample=True, findings=[
+    Finding(requirement_id='python', status='SUPPORTED',
+            evidence=Passage(id='p1', text=text), confidence=0.9)
+])
+store.finish(row, 'READY', extraction_method='native',
+             assessment=assessment.model_dump(mode='json'))
+""",
+        ],
+        env=environment,
+        check=True,
+    )
     api = subprocess.Popen(
         [
             sys.executable,

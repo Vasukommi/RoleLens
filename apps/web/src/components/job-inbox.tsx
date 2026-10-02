@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import logo from "../../assets/logo - 1.png";
+import { Select } from "@/components/select";
 import { api } from "@/lib/api";
 import { reviewCsv } from "@/lib/export";
 import {
@@ -636,22 +637,19 @@ export function JobInbox() {
                     }}
                   />
                 </label>
-                <select
+                <Select
                   aria-label="Filter processing status"
                   value={status}
-                  onChange={(event) => {
-                    setStatus(event.target.value);
+                  onValueChange={(value) => {
+                    setStatus(value);
                     setPage(1);
                   }}
-                >
-                  <option value="">All applications</option>
-                  {Object.entries(PIPELINE).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                  <option value="REVIEWED">Reviewed</option>
-                </select>
+                  options={[
+                    { value: "", label: "All applications" },
+                    ...Object.entries(PIPELINE).map(([value, label]) => ({ value, label })),
+                    { value: "REVIEWED", label: "Reviewed" },
+                  ]}
+                />
                 <button
                   className="button button-secondary"
                   onClick={() => void retry(`jobs/${jobId}/retry`)}
@@ -854,23 +852,21 @@ export function JobInbox() {
                         {findingStatus && (
                           <div className="correction">
                             <label htmlFor="inbox-correction">Reviewer correction</label>
-                            <select
+                            <Select
                               id="inbox-correction"
                               value={findingStatus}
-                              onChange={(event) => {
+                              onValueChange={(value) => {
                                 setOverrides((current) => ({
                                   ...current,
-                                  [criterion]: event.target.value as EvidenceStatus,
+                                  [criterion]: value as EvidenceStatus,
                                 }));
                                 setDirty(true);
                               }}
-                            >
-                              {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                                <option key={value} value={value}>
-                                  {label}
-                                </option>
-                              ))}
-                            </select>
+                              options={Object.entries(STATUS_LABELS).map(([value, label]) => ({
+                                value,
+                                label,
+                              }))}
+                            />
                           </div>
                         )}
                       </aside>
