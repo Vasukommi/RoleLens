@@ -106,7 +106,10 @@ async def run():
                     active.add(
                         asyncio.create_task(process(store, settings, row, provider, worker_id))
                     )
-                await asyncio.sleep(0.5 if active else 1)
+                if active:
+                    await asyncio.wait(active, timeout=1, return_when=asyncio.FIRST_COMPLETED)
+                else:
+                    await asyncio.sleep(1)
             except Exception:
                 logger.error("Worker database unavailable. Check migrations and connectivity.")
                 await asyncio.sleep(5)
