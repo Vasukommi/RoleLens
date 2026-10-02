@@ -265,7 +265,12 @@ def test_verification_and_interview_items_never_go_to_resume_judgment():
 
 def test_verifier_uncertainty_is_explicit():
     def handler(request):
-        questions = json.loads(request.content)["questions"]
+        payload = json.loads(request.content)
+        questions = payload["questions"]
+        assert payload["state"]["description"] == DESCRIPTION
+        assert payload["state"]["criteria"]["r1"]["text"] == EXTRACTED["criteria"][0]["text"]
+        assert EXTRACTED["criteria"][0]["text"] not in questions["r1"]["instructions"]
+        assert EXTRACTED["criteria"][0]["source_quote"] not in questions["r1"]["instructions"]
         return httpx.Response(
             200,
             json={
@@ -344,7 +349,7 @@ def test_authentication_cache_and_immutable_job_snapshot(client):
     assert data["requirements"][0]["source_quote"] == EXTRACTED["criteria"][0]["source_quote"]
     assert data["requirements"][1]["assessment_mode"] == "VERIFY_SEPARATELY"
     assert data["requirements"][2]["assessment_mode"] == "VERIFY_SEPARATELY"
-    assert data["interpretation"]["prompt_version"] == "jd-interpretation-v4"
+    assert data["interpretation"]["prompt_version"] == "jd-interpretation-v5"
     assert (
         store.interpretation(first.json()["id"])["result"]["requirements"][1]["assessment_mode"]
         == "RESUME_EVIDENCE"
