@@ -8,6 +8,7 @@ const ALLOWED = new Map([
   ["sample", "GET"],
   ["resumes", "POST"],
   ["assessments", "POST"],
+  ["job-interpretations", "POST"],
 ]);
 const MAX_BODY = 6 * 1024 * 1024;
 const ID = "[0-9a-f-]{36}";
@@ -30,6 +31,35 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     INBOX_ROUTES.some((entry) => entry.path.test(route) && entry.methods.includes(request.method));
   if (!allowed) {
     return NextResponse.json({ detail: "Endpoint not found." }, { status: 404 });
+  }
+  const analyzingDescription = route === "job-interpretations";
+  if (analyzingDescription) {
+    const origin = request.headers.get("origin");
+    // Next.js can normalize nextUrl.hostname to localhost in development. Compare the
+    // browser's actual authority to Host, while still checking the scheme and fetch metadata.
+    let sameOrigin = origin === null;
+    if (origin !== null) {
+      try {
+        const parsed = new URL(origin);
+        sameOrigin =
+          parsed.host === request.headers.get("host") &&
+          parsed.protocol === request.nextUrl.protocol;
+      } catch {
+        sameOrigin = false;
+      }
+    }
+    if (request.headers.get("sec-fetch-site") === "cross-site" || !sameOrigin) {
+      return NextResponse.json(
+        { detail: "Cross-origin analysis is not allowed." },
+        { status: 403 },
+      );
+    }
+    if (!process.env.WORKSPACE_API_KEY) {
+      return NextResponse.json(
+        { detail: "Configure WORKSPACE_API_KEY on the web and API servers to enable analysis." },
+        { status: 503 },
+      );
+    }
   }
   let body: Uint8Array | undefined;
   if (["POST", "PATCH"].includes(request.method) && request.body) {
@@ -67,9 +97,14 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     }
     const response = await fetch(`${base.replace(/\/$/, "")}/api/v1/${route}?${query}`, {
       method: request.method,
-      headers: body
-        ? { "Content-Type": request.headers.get("content-type") ?? "application/json" }
-        : {},
+      headers: {
+        ...(body
+          ? { "Content-Type": request.headers.get("content-type") ?? "application/json" }
+          : {}),
+        ...(analyzingDescription
+          ? { Authorization: `Bearer ${process.env.WORKSPACE_API_KEY}` }
+          : {}),
+      },
       body: body as BodyInit | undefined,
       cache: "no-store",
       signal: AbortSignal.timeout(120_000),

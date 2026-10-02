@@ -6,6 +6,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     typesafe_api_key: SecretStr = SecretStr("")
+    openai_api_key: SecretStr = SecretStr("")
+    openai_jd_model: str = Field(default="gpt-6-luna", min_length=1, max_length=100)
+    workspace_api_key: SecretStr = SecretStr("")
+    jd_requests_per_minute: int = Field(default=6, ge=1, le=60)
     typesafe_model: str = "jev-latest"
     model_confidence_floor: float = Field(default=0.65, ge=0, le=1)
     database_url: str = "sqlite:///./data/rolelens.db"

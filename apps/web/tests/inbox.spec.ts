@@ -8,6 +8,7 @@ test("bulk intake processes documents, paginates, deduplicates, and saves a revi
   await page.goto("/");
   await page.getByRole("button", { name: "New job", exact: true }).click();
   const title = `Bulk job ${Date.now()}`;
+  await page.getByRole("button", { name: "Enter criteria manually" }).click();
   await page.getByLabel("Job title").fill(title);
   await page
     .getByLabel("Job requirements", { exact: false })
@@ -75,6 +76,7 @@ test("external application arrives automatically and duplicate delivery returns 
   await page.goto("/");
   await page.getByRole("button", { name: "New job", exact: true }).click();
   const title = `Integrated job ${Date.now()}`;
+  await page.getByRole("button", { name: "Enter criteria manually" }).click();
   await page.getByLabel("Job title").fill(title);
   await page.getByLabel("Job requirements", { exact: false }).fill("Built Python APIs");
   await page.getByRole("dialog").getByRole("button", { name: "Create job", exact: true }).click();

@@ -51,6 +51,8 @@ test("inbox filter supports keyboard navigation, typeahead, cancellation, and em
 
 test("profile menu supports keyboard access and enters an isolated demo", async ({ page }) => {
   await page.goto("/exports");
+  // The profile trigger is server-rendered. Wait for workspace hydration before sending keys.
+  await expect(page.getByRole("combobox", { name: "Job", exact: true })).toBeVisible();
   const trigger = page.getByRole("button", { name: "Workspace profile" });
   await trigger.focus();
   await trigger.press("Enter");

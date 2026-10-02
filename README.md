@@ -19,6 +19,7 @@ Create a job once, receive applications from an external source or import many r
 - Dedicated Jobs, Resume library, and Exports navigation, with a workspace profile menu.
 - An isolated demo with 200 fictional profiles, folders, example jobs, and preset shortlist comparisons; no API or Jev key required.
 - Persistent jobs, applications, processing status, and reviewer work.
+- Paste an ordinary JD, review source-linked criteria and priorities, then save a fixed job definition. OpenAI interprets descriptions; Jev verifies interpretations and assesses resume evidence.
 - Bulk file selection with three concurrent uploads, individual errors, safe retry receipts, and duplicate detection.
 - An authenticated text/file intake API with source IDs and status receipts.
 - A [runnable careers-form integration](docs/integrations.md). Named ATS connectors are not implemented yet.
@@ -68,13 +69,15 @@ Frontend terminal, from the root:
 npm run dev
 ```
 
-Open [localhost:3000](http://localhost:3000). Create a job, enter explicit requirements, then select multiple PDF/DOCX/TXT files with **Import resumes**. Accepted applications are durable; keep the tab open until all file uploads complete. Parsed documents wait for provider configuration when no Jev key exists. API documentation: [localhost:8000/docs](http://localhost:8000/docs).
+Open [localhost:3000](http://localhost:3000). Create a job, paste its description, and review the extracted criteria. Alternatively, choose **Enter criteria manually** without OpenAI. Then select multiple PDF/DOCX/TXT files with **Import resumes**. Accepted applications are durable; keep the tab open until all file uploads complete. Parsed documents wait for provider configuration when no Jev key exists. API documentation: [localhost:8000/docs](http://localhost:8000/docs).
 
 For scanned PDFs, install Tesseract with English language data (`brew install tesseract` on supported macOS setups, or `sudo apt-get install tesseract-ocr tesseract-ocr-eng` on Debian/Ubuntu). Compose includes it. Text PDFs, DOCX, and TXT do not need the OCR binary. OCR-derived text can contain transcription errors; reviewers should check the original source document.
 
 See the [demo walkthrough](docs/demo.md) to explore example folders, jobs, comparison results, and exports. The recorded video above shows the earlier intake/review interface.
 
 ## Configuration
+
+For description analysis, set `OPENAI_API_KEY` in `apps/api/.env`. `OPENAI_JD_MODEL` defaults to `gpt-6-luna`. Generate a separate `WORKSPACE_API_KEY` (`openssl rand -hex 32`) and put the same value in `apps/api/.env` and `apps/web/.env.local`. Restart the API and frontend. In Compose, set these values in the root `.env`; Compose forwards the workspace token to both servers, and the OpenAI key only to backend services. See [JD interpretation, model choice, and limitations](docs/job-descriptions.md).
 
 Set `TYPESAFE_API_KEY` in `apps/api/.env` for automatic live assessments. Restart **both API and worker** after changing configuration. New and waiting applications then process automatically, sending resume passages and requirements to hosted Jev; calls may incur provider charges. The key is never sent to the browser.
 
@@ -109,7 +112,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Browser tests start isolated API, worker, careers-form, and Next.js processes on ports 8010, 9010, and 3010. They use a temporary database and synthetic credentials, and never call Jev. From `apps/api`:
+Browser tests start isolated API, worker, careers-form, and Next.js processes on ports 8010, 9010, and 3010. They use a temporary database and synthetic credentials, and never call OpenAI or Jev. From `apps/api`:
 
 ```sh
 uv run ruff check . ../../examples/careers-form/app.py

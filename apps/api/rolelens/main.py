@@ -9,6 +9,7 @@ from rolelens.config import Settings
 from rolelens.dependencies import database, get_settings
 from rolelens.documents import MAX_UPLOAD_BYTES, DocumentError, parse_resume
 from rolelens.intake import router
+from rolelens.job_descriptions import router as description_router
 from rolelens.middleware import IntakeBodyLimit
 from rolelens.providers import AssessmentProvider, JevProvider, ProviderError
 from rolelens.sample import sample_workspace
@@ -18,6 +19,7 @@ from rolelens.storage import IntakeConflict
 app = FastAPI(title="RoleLens API", version="0.1.0")
 app.add_middleware(IntakeBodyLimit)
 app.include_router(router)
+app.include_router(description_router)
 
 
 @app.exception_handler(IntakeConflict)
@@ -56,6 +58,10 @@ def health(settings: Annotated[Settings, Depends(get_settings)]) -> dict:
         "assessment_available": settings.assessment_available,
         "model": settings.typesafe_model if settings.assessment_available else None,
         "worker_active": worker_active,
+        "description_analysis_available": bool(
+            settings.openai_api_key.get_secret_value()
+            and settings.workspace_api_key.get_secret_value()
+        ),
     }
 
 

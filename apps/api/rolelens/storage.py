@@ -40,6 +40,18 @@ jobs = Table(
     Column("id", String(36), primary_key=True),
     Column("title", String(100), nullable=False),
     Column("requirements", JSON, nullable=False),
+    Column("description", Text),
+    Column("interpretation", JSON),
+    Column("created_at", Float, nullable=False),
+)
+job_interpretations = Table(
+    "job_interpretations",
+    metadata,
+    Column("id", String(36), primary_key=True),
+    Column("cache_key", String(64), nullable=False, unique=True),
+    Column("title", String(100), nullable=False),
+    Column("description", Text, nullable=False),
+    Column("result", JSON, nullable=False),
     Column("created_at", Float, nullable=False),
 )
 batches = Table(
@@ -116,15 +128,62 @@ class Store:
                 connection.execute("PRAGMA busy_timeout=10000")
                 connection.execute("PRAGMA journal_mode=WAL")
 
-    def create_job(self, title: str, requirements: list[dict]) -> dict:
+    def create_job(
+        self, title: str, requirements: list[dict], *, description=None, interpretation=None
+    ) -> dict:
         row = {
             "id": str(uuid4()),
             "title": title,
             "requirements": requirements,
+            "description": description,
+            "interpretation": interpretation,
             "created_at": time.time(),
         }
         with self.engine.begin() as connection:
             connection.execute(insert(jobs).values(**row))
+        return row
+
+    def cached_interpretation(self, cache_key: str) -> dict | None:
+        with self.engine.connect() as connection:
+            row = (
+                connection.execute(
+                    select(job_interpretations).where(job_interpretations.c.cache_key == cache_key)
+                )
+                .mappings()
+                .first()
+            )
+        return dict(row) if row else None
+
+    def interpretation(self, interpretation_id: str) -> dict:
+        with self.engine.connect() as connection:
+            row = (
+                connection.execute(
+                    select(job_interpretations).where(job_interpretations.c.id == interpretation_id)
+                )
+                .mappings()
+                .first()
+            )
+        if row is None:
+            raise KeyError(interpretation_id)
+        return dict(row)
+
+    def save_interpretation(self, cache_key: str, title: str, description: str, result: dict):
+        row = dict(
+            id=str(uuid4()),
+            cache_key=cache_key,
+            title=title,
+            description=description,
+            result=result,
+            created_at=time.time(),
+        )
+        try:
+            with self.engine.begin() as connection:
+                connection.execute(insert(job_interpretations).values(**row))
+        except IntegrityError:
+            cached = self.cached_interpretation(cache_key)
+            if cached is None:
+                raise
+            return cached
         return row
 
     def list_jobs(self) -> list[dict]:

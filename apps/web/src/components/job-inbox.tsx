@@ -25,6 +25,7 @@ import type {
   JobSummary as Summary,
 } from "@/lib/inbox-types";
 import { Select } from "@/components/select";
+import { CreateJobDialog } from "@/components/create-job-dialog";
 import { api } from "@/lib/api";
 import { reviewCsv } from "@/lib/export";
 import { STATUS_LABELS, type Candidate, type EvidenceStatus } from "@/lib/types";
@@ -69,14 +70,11 @@ export function JobInbox({ section = "library" }: { section?: WorkspaceSection }
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [creating, setCreating] = useState(false);
-  const [title, setTitle] = useState("");
-  const [criteria, setCriteria] = useState("");
   const [items, setItems] = useState<UploadItem[]>([]);
   const [batchId, setBatchId] = useState("");
   const [importing, setImporting] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-  const dialog = useRef<HTMLDialogElement>(null);
   const reviewDialog = useRef<HTMLDialogElement>(null);
   const reviewOpen = selected !== null;
   const currentJob = jobs.find((j) => j.id === jobId);
@@ -144,11 +142,6 @@ export function JobInbox({ section = "library" }: { section?: WorkspaceSection }
   }, [refresh]);
 
   useEffect(() => {
-    if (creating) dialog.current?.showModal();
-    else dialog.current?.close();
-  }, [creating]);
-
-  useEffect(() => {
     if (reviewOpen) reviewDialog.current?.showModal();
     else reviewDialog.current?.close();
   }, [reviewOpen]);
@@ -200,41 +193,6 @@ export function JobInbox({ section = "library" }: { section?: WorkspaceSection }
     setSearch("");
     setStatus("");
     router.push(`/?job=${id}`);
-  }
-
-  async function createJob() {
-    const requirements = criteria
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .map((text, index) => ({ id: `r${index + 1}`, text }));
-    if (
-      !title.trim() ||
-      requirements.length < 1 ||
-      requirements.length > 12 ||
-      requirements.some((r) => r.text.length < 3 || r.text.length > 300)
-    ) {
-      setError("Enter a title and 1–12 explicit requirements, 3–300 characters each.");
-      return;
-    }
-    setSaving(true);
-    try {
-      const job = await api<Job>("jobs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), requirements }),
-      });
-      setJobs((current) => [job, ...current]);
-      chooseJob(job.id);
-      setCreating(false);
-      setTitle("");
-      setCriteria("");
-      setError("");
-    } catch (failure) {
-      setError((failure as Error).message);
-    } finally {
-      setSaving(false);
-    }
   }
 
   async function uploadPending(selection: UploadItem[], existingBatch = "") {
@@ -517,12 +475,30 @@ export function JobInbox({ section = "library" }: { section?: WorkspaceSection }
                     <BriefcaseBusiness size={18} />
                   </div>
                   <h2>{job.title}</h2>
-                  <p>{job.requirements.length} explicit requirements</p>
+                  <p>{job.requirements.length} assessment criteria</p>
                   <ul className="job-criteria-preview">
                     {job.requirements.slice(0, 3).map((requirement) => (
                       <li key={requirement.id}>{requirement.text}</li>
                     ))}
                   </ul>
+                  {job.description && (
+                    <details className="saved-job-description">
+                      <summary>View job definition</summary>
+                      <p className="saved-description-text">{job.description}</p>
+                      <ul>
+                        {job.requirements.map((item) => (
+                          <li key={item.id}>
+                            <strong>{item.text}</strong>
+                            <span>
+                              {item.priority ?? "UNSPECIFIED"} ·{" "}
+                              {item.assessment_mode?.replaceAll("_", " ")}
+                            </span>
+                            {item.review_note && <span>{item.review_note}</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
                   <button
                     className="button button-secondary"
                     aria-label={`Open resumes for ${job.title}`}
@@ -956,74 +932,20 @@ export function JobInbox({ section = "library" }: { section?: WorkspaceSection }
           </>
         )}
       </WorkspaceShell>
-      <dialog
-        ref={dialog}
-        aria-labelledby="new-job-title"
-        onCancel={() => {
-          setCreating(false);
-          setError("");
-        }}
-      >
-        <div className="dialog-header">
-          <h2 id="new-job-title">Create a job</h2>
-          <button
-            className="icon-button"
-            aria-label="Close dialog"
-            onClick={() => setCreating(false)}
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <p className="dialog-description">
-          All incoming applications use these requirements. Criteria are fixed for this job so
-          results remain comparable. Processing starts automatically and sends resume passages to
-          TypeSafe when Jev is configured.
-        </p>
-        <label className="form-label" htmlFor="job-name">
-          Job title
-        </label>
-        <input
-          id="job-name"
-          className="form-input"
-          maxLength={100}
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          autoFocus
+      {creating && (
+        <CreateJobDialog
+          onClose={() => {
+            setCreating(false);
+            setError("");
+          }}
+          onCreated={(job) => {
+            setJobs((current) => [job, ...current]);
+            chooseJob(job.id);
+            setCreating(false);
+            setError("");
+          }}
         />
-        <label className="form-label" htmlFor="job-requirements">
-          Job requirements<span>One per line · up to 12</span>
-        </label>
-        <textarea
-          id="job-requirements"
-          className="form-input criteria-input"
-          value={criteria}
-          onChange={(event) => setCriteria(event.target.value)}
-        />
-        {error && (
-          <div className="alert alert-error" role="alert">
-            {error}
-          </div>
-        )}
-        <div className="dialog-footer">
-          <button
-            className="button button-secondary"
-            disabled={saving}
-            onClick={() => {
-              setCreating(false);
-              setError("");
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            className="button button-primary"
-            disabled={saving}
-            onClick={() => void createJob()}
-          >
-            Create job
-          </button>
-        </div>
-      </dialog>
+      )}
     </>
   );
 }

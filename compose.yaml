@@ -1,6 +1,10 @@
 x-api-environment: &api-environment
   DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://rolelens:rolelens-local@db:5432/rolelens}
   TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_JD_MODEL: ${OPENAI_JD_MODEL:-gpt-6-luna}
+  WORKSPACE_API_KEY: ${WORKSPACE_API_KEY:-}
+  JD_REQUESTS_PER_MINUTE: ${JD_REQUESTS_PER_MINUTE:-6}
   TYPESAFE_MODEL: ${TYPESAFE_MODEL:-jev-latest}
   MODEL_CONFIDENCE_FLOOR: ${MODEL_CONFIDENCE_FLOOR:-0.65}
   INTAKE_API_KEY: ${INTAKE_API_KEY:-}
@@ -80,6 +84,7 @@ services:
       dockerfile: apps/web/Dockerfile
     environment:
       API_BASE_URL: http://api:8000
+      WORKSPACE_API_KEY: ${WORKSPACE_API_KEY:-}
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:

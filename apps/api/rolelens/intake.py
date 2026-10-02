@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from rolelens.config import Settings
 from rolelens.dependencies import get_settings, get_store
 from rolelens.documents import MAX_UPLOAD_BYTES
-from rolelens.schemas import EvidenceStatus, Requirement
+from rolelens.schemas import MAX_REQUIREMENTS, EvidenceStatus, Requirement
 from rolelens.storage import Store
 
 router = APIRouter(prefix="/api/v1", tags=["Application intake"])
@@ -22,7 +22,9 @@ bearer = HTTPBearer(auto_error=False)
 class NewJob(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     title: str = Field(min_length=1, max_length=100)
-    requirements: list[Requirement] = Field(min_length=1, max_length=12)
+    requirements: list[Requirement] = Field(min_length=1, max_length=MAX_REQUIREMENTS)
+    interpretation_id: UUID | None = None
+    interpretation_reviewed: bool = False
 
     @field_validator("requirements")
     @classmethod
@@ -51,7 +53,7 @@ class ReviewUpdate(BaseModel):
     version: int = Field(ge=1)
     notes: str = Field(default="", max_length=2000)
     reviewed: bool = False
-    overrides: dict[str, EvidenceStatus] = Field(default_factory=dict, max_length=12)
+    overrides: dict[str, EvidenceStatus] = Field(default_factory=dict, max_length=MAX_REQUIREMENTS)
 
 
 def intake_auth(
@@ -76,7 +78,49 @@ def list_jobs(store: Database):
 
 @router.post("/jobs", status_code=201)
 def create_job(request: NewJob, store: Database):
-    return store.create_job(request.title, [r.model_dump() for r in request.requirements])
+    requirements = [r.model_dump() for r in request.requirements]
+    if request.interpretation_id is None:
+        return store.create_job(request.title, requirements)
+    if not request.interpretation_reviewed:
+        raise HTTPException(422, "Review and confirm the interpretation before creating the job.")
+    draft = store.interpretation(str(request.interpretation_id))
+    if request.title != draft["title"]:
+        raise HTTPException(409, "The title changed after analysis. Analyze the description again.")
+    proposed = {item["id"]: item for item in draft["result"]["requirements"]}
+    edits = []
+    for item in requirements:
+        original = proposed.get(item["id"])
+        if original is None:
+            raise HTTPException(422, "The criterion does not belong to this interpretation.")
+        item["source_quote"] = original["source_quote"]
+        item["review_note"] = original["review_note"]
+        text_changed = item["text"] != original["text"]
+        if text_changed or item["priority"] != original["priority"]:
+            edits.append(item["id"])
+            item["review_note"] = (
+                "Criterion edited by the job owner; "
+                "source validation refers to the original proposal."
+            )
+        if not text_changed and draft["result"]["validation"].get(item["id"]) != "GROUNDED":
+            item["assessment_mode"] = "VERIFY_SEPARATELY"
+            item["review_note"] = (
+                (item["review_note"] + " " if item["review_note"] else "")
+                + "Source interpretation needs verification; "
+                "excluded from automatic evidence assessment."
+            )[:600]
+        if original["assessment_mode"] != "RESUME_EVIDENCE":
+            item["assessment_mode"] = original["assessment_mode"]
+    snapshot = {
+        **draft["result"],
+        "id": draft["id"],
+        "reviewed": True,
+        "edited_criteria": edits,
+        "approved_requirements": requirements,
+        "version": 1,
+    }
+    return store.create_job(
+        request.title, requirements, description=draft["description"], interpretation=snapshot
+    )
 
 
 @router.get("/jobs/{job_id}/summary")

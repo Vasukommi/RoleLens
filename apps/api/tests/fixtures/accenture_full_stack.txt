@@ -1,0 +1,26 @@
+Project Role: Full Stack Engineer
+Project Role Description: Responsible for developing and/or engineering the end-to-end features of a system, from user experience to backend code. Use development skills to deliver innovative solutions that help our clients improve the services they provide. Leverage new technologies that can be applied to solve challenging business problems with a cloud first and agile mindset.
+Must have skills: Node.js
+Good to have skills: NA
+Minimum 3 Year(s) Of Experience Is Required
+Educational Qualification: 15 years full time education
+Summary:
+As a Full Stack Engineer, your day involves designing and building comprehensive system features that span from the user interface to the backend infrastructure. You engage in creating seamless experiences for users while ensuring robust and scalable backend solutions. Your work focuses on delivering innovative and efficient solutions that address complex business challenges. You collaborate with cross-functional teams to integrate new technologies and adopt agile methodologies, fostering continuous improvement and adaptability in a cloud-first environment. This role requires balancing creativity with technical precision to enhance client services effectively.
+Roles & Responsibilities:
+Expected to perform independently and become an SME.
+Required active participation/contribution in team discussions.
+Contribute in providing solutions to work related problems.
+Collaborate with team members to review and improve code quality and system design.
+Assist in mentoring junior team members to support their professional growth.
+Continuously explore and evaluate emerging technologies to enhance project outcomes.
+Professional & Technical Skills:
+Must To Have Skills: Proficiency in Node.js.
+Strong knowledge of JavaScript and asynchronous programming patterns.
+Experience with RESTful API design and development.
+Familiarity with database systems such as SQL and NoSQL.
+Understanding of cloud platforms and deployment strategies.
+Ability to write clean, maintainable, and well-documented code.
+Additional Information:
+The candidate should have minimum 3 years of experience in Node.js.
+This position is based at our Hyderabad office.
+A 15 years full time education is required.
