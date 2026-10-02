@@ -1,12 +1,41 @@
+x-api-environment: &api-environment
+  DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://rolelens:rolelens-local@db:5432/rolelens}
+  TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
+  TYPESAFE_MODEL: ${TYPESAFE_MODEL:-jev-latest}
+  MODEL_CONFIDENCE_FLOOR: ${MODEL_CONFIDENCE_FLOOR:-0.65}
+  INTAKE_API_KEY: ${INTAKE_API_KEY:-}
+  WORKER_LEASE_SECONDS: ${WORKER_LEASE_SECONDS:-90}
+  WORKER_MAX_ATTEMPTS: ${WORKER_MAX_ATTEMPTS:-4}
+
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: rolelens
+      POSTGRES_USER: rolelens
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rolelens-local}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rolelens -d rolelens"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: [".venv/bin/alembic", "upgrade", "head"]
+    environment: *api-environment
+    depends_on:
+      db:
+        condition: service_healthy
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
-    environment:
-      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
-      TYPESAFE_MODEL: ${TYPESAFE_MODEL:-jev-latest}
-      MODEL_CONFIDENCE_FLOOR: ${MODEL_CONFIDENCE_FLOOR:-0.65}
+    environment: *api-environment
     healthcheck:
       test:
         [
@@ -14,6 +43,31 @@ services:
           ".venv/bin/python",
           "-c",
           "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    init: true
+    restart: unless-stopped
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: [".venv/bin/python", "-m", "rolelens.worker"]
+    environment: *api-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          ".venv/bin/python",
+          "-c",
+          "from rolelens.config import Settings; from rolelens.storage import Store; assert Store(Settings().database_url).worker_active()",
         ]
       interval: 10s
       timeout: 5s
@@ -33,3 +87,5 @@ services:
         condition: service_healthy
     init: true
     restart: unless-stopped
+volumes:
+  database:

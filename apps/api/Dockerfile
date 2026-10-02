@@ -6,6 +6,8 @@ RUN pip install --no-cache-dir uv==0.12.3
 COPY apps/api/pyproject.toml apps/api/uv.lock ./
 RUN uv sync --frozen --no-dev
 COPY apps/api/rolelens ./rolelens
+COPY apps/api/alembic.ini ./
+COPY apps/api/migrations ./migrations
 RUN useradd --create-home --uid 10001 rolelens
 USER rolelens
 EXPOSE 8000

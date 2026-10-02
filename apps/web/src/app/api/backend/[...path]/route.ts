@@ -10,14 +10,29 @@ const ALLOWED = new Map([
   ["assessments", "POST"],
 ]);
 const MAX_BODY = 6 * 1024 * 1024;
+const ID = "[0-9a-f-]{36}";
+const INBOX_ROUTES = [
+  { path: /^jobs$/, methods: ["GET", "POST"] },
+  { path: new RegExp(`^jobs/${ID}/summary$`), methods: ["GET"] },
+  { path: new RegExp(`^jobs/${ID}/batches$`), methods: ["POST"] },
+  { path: new RegExp(`^jobs/${ID}/applications$`), methods: ["GET", "POST"] },
+  { path: new RegExp(`^jobs/${ID}/retry$`), methods: ["POST"] },
+  { path: new RegExp(`^applications/${ID}$`), methods: ["GET"] },
+  { path: new RegExp(`^applications/${ID}/review$`), methods: ["PATCH"] },
+  { path: new RegExp(`^applications/${ID}/retry$`), methods: ["POST"] },
+];
 
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
-  if (path.length !== 1 || ALLOWED.get(path[0]) !== request.method) {
+  const route = path.join("/");
+  const allowed =
+    (path.length === 1 && ALLOWED.get(path[0]) === request.method) ||
+    INBOX_ROUTES.some((entry) => entry.path.test(route) && entry.methods.includes(request.method));
+  if (!allowed) {
     return NextResponse.json({ detail: "Endpoint not found." }, { status: 404 });
   }
   let body: Uint8Array | undefined;
-  if (request.method === "POST") {
+  if (["POST", "PATCH"].includes(request.method) && request.body) {
     const declaredSize = Number(request.headers.get("content-length") ?? 0);
     if (declaredSize > MAX_BODY) {
       return NextResponse.json({ detail: "Files must be 5 MB or smaller." }, { status: 413 });
@@ -45,7 +60,12 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   }
   try {
     const base = process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
-    const response = await fetch(`${base.replace(/\/$/, "")}/api/v1/${path[0]}`, {
+    const query = new URLSearchParams();
+    for (const key of ["page", "search", "status"]) {
+      const value = request.nextUrl.searchParams.get(key);
+      if (value !== null) query.set(key, value);
+    }
+    const response = await fetch(`${base.replace(/\/$/, "")}/api/v1/${route}?${query}`, {
       method: request.method,
       headers: body
         ? { "Content-Type": request.headers.get("content-type") ?? "application/json" }
@@ -68,3 +88,4 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 
 export const GET = proxy;
 export const POST = proxy;
+export const PATCH = proxy;

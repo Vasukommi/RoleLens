@@ -1214,3 +1214,396 @@ dialog::backdrop {
     gap: 4px;
   }
 }
+
+/* Job intake: list payloads are paginated; source documents load on selection. */
+.inbox-shell {
+  min-height: 100vh;
+}
+.inbox-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: 208px;
+  background: var(--sidebar);
+  border-right: 1px solid var(--line);
+  padding: 25px 14px 16px;
+  display: flex;
+  flex-direction: column;
+}
+.inbox-main {
+  margin-left: 208px;
+}
+.inbox-nav {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  font-size: 12px;
+  padding: 10px;
+  background: #e9ecf1;
+  border-radius: 5px;
+}
+.job-navigation {
+  max-height: 45vh;
+  overflow-y: auto;
+}
+.job-navigation button {
+  border: 0;
+  background: transparent;
+  display: block;
+  width: 100%;
+  text-align: left;
+  border-radius: 5px;
+  padding: 10px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  color: #636a75;
+}
+.job-navigation button[aria-pressed="true"] {
+  background: #edf1f8;
+  color: #3b5593;
+}
+.inbox-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border-block: 1px solid var(--line);
+  padding: 17px 0;
+  margin-bottom: 16px;
+}
+.inbox-stats > div {
+  padding: 0 20px;
+  border-right: 1px solid var(--line);
+}
+.inbox-stats > div:first-child {
+  padding-left: 0;
+}
+.inbox-stats > div:last-child {
+  border-right: 0;
+}
+.inbox-stats span {
+  color: var(--muted);
+  font-size: 12px;
+  display: block;
+}
+.inbox-stats strong {
+  font-weight: 550;
+  font-size: 24px;
+  font-variant-numeric: tabular-nums;
+}
+.pipeline-message {
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 7px 0;
+}
+.import-progress {
+  border: 1px solid var(--line);
+  background: #fafbfc;
+  padding: 14px 16px;
+  border-radius: 6px;
+  margin: 18px 0;
+  font-size: 12px;
+}
+.import-progress > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.import-progress strong {
+  font-weight: 550;
+}
+.import-progress span,
+.import-progress p {
+  color: var(--muted);
+}
+.import-progress progress {
+  display: block;
+  width: 100%;
+  height: 6px;
+  accent-color: #5a708f;
+  margin: 12px 0;
+}
+.import-progress details {
+  margin-top: 10px;
+}
+.import-progress details p {
+  overflow-wrap: anywhere;
+  margin: 6px 0;
+}
+.inbox-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 24px 0 12px;
+  flex-wrap: wrap;
+}
+.inbox-toolbar .search-field {
+  margin: 0;
+  flex: 1;
+  max-width: 350px;
+}
+.inbox-toolbar select {
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-size: 12px;
+  padding: 8px 10px;
+  background: white;
+  min-width: 160px;
+}
+.inbox-toolbar > .button {
+  margin-left: auto;
+  font-size: 12px;
+}
+.inbox-table-wrap {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+.inbox-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 12px;
+}
+.inbox-table th {
+  background: #fafbfc;
+  color: #6b7280;
+  font-weight: 500;
+  font-size: 11px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.inbox-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  color: #6b7280;
+}
+.inbox-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.inbox-table tr.selected {
+  background: #f2f5fb;
+}
+.inbox-table td:first-child {
+  width: 42%;
+}
+.inbox-table td button {
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: #303742;
+  font-size: 13px;
+  padding: 0;
+  font-weight: 500;
+}
+.inbox-table td button:hover {
+  text-decoration: underline;
+}
+.inbox-table td button span {
+  display: block;
+  font-size: 11px;
+  color: #7d8797;
+  font-weight: 400;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+.pipeline-status {
+  font-size: 11px;
+  white-space: nowrap;
+}
+.pipeline-ready {
+  color: #497555;
+}
+.pipeline-failed {
+  color: #a15748;
+}
+.pipeline-awaiting_provider,
+.pipeline-retry_wait {
+  color: #906c33;
+}
+.review-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #497555;
+}
+.inbox-table .inbox-empty {
+  padding: 45px 20px;
+  text-align: center;
+}
+.inbox-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: #6b7280;
+  margin: 10px 0 20px;
+}
+.inbox-pagination > div {
+  display: flex;
+}
+.persistent-review {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 18px;
+}
+.persistent-review .review-header {
+  border-bottom: 1px solid var(--line);
+}
+.application-error {
+  padding: 12px 20px;
+  background: #fcf4f3;
+  color: #984842;
+  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.review-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.review-checkbox input {
+  accent-color: #4b5a71;
+}
+.review-save-state {
+  color: #6b7280;
+  font-size: 11px;
+  margin-top: 9px;
+}
+.intake-details {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 24px;
+  line-height: 1.8;
+}
+.intake-details p {
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+.intake-details summary,
+.import-progress summary {
+  cursor: pointer;
+}
+@media (max-width: 900px) {
+  .inbox-sidebar {
+    width: 174px;
+    padding-inline: 10px;
+  }
+  .inbox-main {
+    margin-left: 174px;
+  }
+  .inbox-stats > div {
+    padding-inline: 10px;
+  }
+  .inbox-stats span {
+    font-size: 11px;
+  }
+}
+@media (max-width: 600px) {
+  .inbox-sidebar {
+    position: static;
+    width: 100%;
+    display: block;
+    padding: 10px 16px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .inbox-sidebar .brand {
+    width: 140px;
+    margin: 0;
+  }
+  .inbox-sidebar .nav-caption,
+  .inbox-sidebar .inbox-nav,
+  .inbox-sidebar .sidebar-spacer,
+  .inbox-sidebar .sidebar-footer,
+  .inbox-sidebar > a.nav-item {
+    display: none;
+  }
+  .job-navigation {
+    display: flex;
+    overflow-x: auto;
+    max-height: none;
+    margin: 6px 0;
+    gap: 5px;
+  }
+  .job-navigation button {
+    width: auto;
+    white-space: nowrap;
+  }
+  .inbox-sidebar > button {
+    padding: 5px 0;
+    width: auto;
+  }
+  .inbox-main {
+    margin-left: 0;
+  }
+  .inbox-stats {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .inbox-stats > div {
+    border: 0;
+    padding: 0;
+  }
+  .inbox-stats strong {
+    font-size: 21px;
+  }
+  .inbox-toolbar .search-field {
+    flex-basis: 100%;
+    max-width: none;
+  }
+  .inbox-toolbar select {
+    flex: 1;
+    min-width: 100px;
+  }
+  .inbox-toolbar > .button {
+    padding: 7px;
+    font-size: 10px;
+  }
+  .inbox-table {
+    min-width: 460px;
+  }
+  .inbox-table th,
+  .inbox-table td {
+    padding: 10px;
+  }
+  .import-progress > div {
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+.application-drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  margin: 0;
+  width: min(820px, 100vw);
+  height: 100vh;
+  max-height: 100vh;
+  padding: 0;
+  border-radius: 0;
+  border: 0;
+  border-left: 1px solid var(--line);
+  overflow-y: auto;
+}
+.application-drawer .persistent-review {
+  border: 0;
+  margin: 0;
+  border-radius: 0;
+  min-height: 100%;
+}
+.application-drawer .review-header {
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 1;
+}
+.inbox-table-wrap {
+  max-height: min(62vh, 650px);
+  overflow: auto;
+}
+.inbox-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
