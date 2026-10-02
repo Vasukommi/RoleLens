@@ -63,6 +63,7 @@ applications = Table(
     Column("fingerprint", String(64), nullable=False),
     Column("payload", LargeBinary),
     Column("text", Text),
+    Column("extraction_method", String(8)),
     Column("assessment", JSON),
     Column("overrides", JSON, nullable=False),
     Column("notes", Text, nullable=False),

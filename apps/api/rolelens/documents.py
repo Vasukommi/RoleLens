@@ -6,6 +6,7 @@ from zipfile import BadZipFile, ZipFile
 from docx import Document
 from pypdf import PdfReader
 
+from rolelens.ocr import OcrError, extract_pages
 from rolelens.schemas import MAX_RESUME_CHARS, ParsedResume, Passage
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
@@ -68,6 +69,7 @@ def parse_resume(filename: str, content: bytes) -> ParsedResume:
     extension = Path(safe_name).suffix.lower()
     if extension not in {".pdf", ".docx", ".txt"}:
         raise DocumentError("Upload a PDF, DOCX, or UTF-8 TXT resume.")
+    extraction_method = "native"
     try:
         if extension == ".pdf":
             reader = PdfReader(BytesIO(content))
@@ -75,7 +77,13 @@ def parse_resume(filename: str, content: bytes) -> ParsedResume:
                 raise DocumentError("Password-protected PDFs are not supported.")
             if len(reader.pages) > 20:
                 raise DocumentError("Resume PDFs must have 20 pages or fewer.")
-            text = "\n\n".join(page.extract_text() or "" for page in reader.pages)
+            texts = [page.extract_text() or "" for page in reader.pages]
+            missing = [index for index, text in enumerate(texts) if len(text.strip()) < 30]
+            if missing:
+                recovered = extract_pages(content, missing)
+                texts = [recovered.get(index, text) for index, text in enumerate(texts)]
+                extraction_method = "ocr" if len(missing) == len(texts) else "mixed"
+            text = "\n\n".join(texts)
         elif extension == ".docx":
             with ZipFile(BytesIO(content)) as archive:
                 entries = archive.infolist()
@@ -94,6 +102,8 @@ def parse_resume(filename: str, content: bytes) -> ParsedResume:
             text = content.decode("utf-8-sig")
     except DocumentError:
         raise
+    except OcrError as error:
+        raise DocumentError(str(error)) from error
     except (BadZipFile, UnicodeDecodeError) as error:
         raise DocumentError(
             "The document is invalid or uses an unsupported text encoding."
@@ -103,4 +113,9 @@ def parse_resume(filename: str, content: bytes) -> ParsedResume:
             "Could not read this document. Try exporting a new PDF or DOCX."
         ) from error
     text = normalize_text(text)
-    return ParsedResume(filename=safe_name, text=text, passages=make_passages(text))
+    return ParsedResume(
+        filename=safe_name,
+        text=text,
+        passages=make_passages(text),
+        extraction_method=extraction_method,
+    )

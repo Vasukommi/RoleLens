@@ -1,0 +1,13 @@
+FICTIONAL DEMO PROFILE — Maya Shah
+
+Backend developer building services for an invented inventory application.
+
+Built REST APIs in Python and FastAPI, including validation and background jobs.
+
+Designed PostgreSQL tables, optimized queries, and added indexes.
+
+Deployed containerized services on AWS ECS and monitored application logs.
+
+Skills: pytest.
+
+This profile is entirely fictional. No real applicant information is shown.

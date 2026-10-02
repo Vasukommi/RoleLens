@@ -43,6 +43,7 @@ type Application = {
   reviewed: boolean;
   version: number;
   text: string | null;
+  extraction_method: "native" | "ocr" | "mixed" | null;
   assessment: Assessment | null;
   overrides: Record<string, EvidenceStatus>;
   notes: string;
@@ -830,6 +831,11 @@ export function JobInbox() {
                           <span>Selected requirement</span>
                           <p>{currentJob.requirements.find((r) => r.id === criterion)?.text}</p>
                         </div>
+                        {["ocr", "mixed"].includes(selected.extraction_method ?? "") && (
+                          <p className="findings-footnote">
+                            OCR-derived text. Check transcription against the original document.
+                          </p>
+                        )}
                         <pre className="resume-text">
                           {sourceText ? (
                             start < 0 ? (
