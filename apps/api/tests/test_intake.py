@@ -13,7 +13,7 @@ from rolelens.config import Settings
 from rolelens.dependencies import get_settings, get_store
 from rolelens.main import app
 from rolelens.providers import ProviderError
-from rolelens.schemas import Assessment, EvidenceStatus, Finding, Passage
+from rolelens.schemas import Assessment, EvidenceStatus, Finding, ParsedResume, Passage
 from rolelens.storage import IntakeConflict, Store, applications, metadata
 from rolelens.worker import process
 
@@ -77,6 +77,29 @@ class SuccessfulProvider:
 class FailedProvider:
     async def assess(self, _request):
         raise ProviderError("Jev could not be reached. Please try again.")
+
+
+def test_worker_persists_ocr_provenance_before_assessment(store, monkeypatch):
+    job = new_job(store)
+    receipt = store.accept(job["id"], "Synthetic scan", "scan.pdf", payload=b"synthetic scan")
+    monkeypatch.setattr(
+        "rolelens.worker.parse_resume",
+        lambda _filename, _content: ParsedResume(
+            filename="scan.pdf", text=TEXT, passages=[], extraction_method="ocr"
+        ),
+    )
+    asyncio.run(
+        process(
+            store,
+            Settings(typesafe_api_key="", _env_file=None),
+            store.claim(False, 90),
+            SuccessfulProvider(),
+        )
+    )
+    stored = store.application(receipt["id"])
+    assert stored["extraction_method"] == "ocr"
+    assert stored["text"] == TEXT
+    assert stored["status"] == "AWAITING_PROVIDER"
 
 
 def test_authenticated_intake_is_idempotent_and_preserves_source(client, store):

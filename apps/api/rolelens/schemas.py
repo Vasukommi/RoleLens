@@ -1,5 +1,6 @@
 import math
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -30,6 +31,7 @@ class ParsedResume(BaseModel):
     filename: str
     text: str
     passages: list[Passage]
+    extraction_method: Literal["native", "ocr", "mixed"] = "native"
 
 
 class AssessmentRequest(BaseModel):

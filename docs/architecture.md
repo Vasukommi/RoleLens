@@ -1,5 +1,9 @@
 # Intake, processing, and review architecture
 
+Scanned and hybrid PDFs use local English OCR for pages with fewer than 30 extracted characters. PDFium renders each page within a six-million-pixel budget, and Tesseract reads the rendered image. Each OCR subprocess has a 25-second timeout and the document has a 120-second elapsed-time budget checked around page processing. Native rendering is not a separately sandboxed process. The worker renews its lease during extraction. Missing OCR software or unusable scans fail visibly instead of producing invented text.
+
+Extraction provenance is stored as `native`, `ocr`, or `mixed`; reviewers see a notice for OCR-derived text. Evidence passages are substrings of the extracted text, which may contain OCR errors. Original upload bytes are cleared after extraction in this version, so verifying transcription requires retaining the original document in the source system. No OCR accuracy claim or automatic hiring decision follows from this extraction.
+
 ```text
 Careers site / future source adapter ── authenticated intake API ──┐
                                                                  │

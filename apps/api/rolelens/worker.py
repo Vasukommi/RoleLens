@@ -40,12 +40,16 @@ async def process(
             )
             return
         text = row["text"]
+        extraction_method = row.get("extraction_method") or "native"
         if text is None:
             parsed = await asyncio.to_thread(parse_resume, row["filename"], row["payload"])
             text = parsed.text
+            extraction_method = parsed.extraction_method
         else:
             text = normalize_text(text)
-        if not await asyncio.to_thread(store.leased_update, row, text=text, payload=None):
+        if not await asyncio.to_thread(
+            store.leased_update, row, text=text, payload=None, extraction_method=extraction_method
+        ):
             return
         if not settings.assessment_available:
             await asyncio.to_thread(store.finish, row, "AWAITING_PROVIDER", attempts=0, error=None)
