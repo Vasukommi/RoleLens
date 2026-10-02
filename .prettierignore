@@ -1,0 +1,11 @@
+node_modules
+.next
+.venv
+uv.lock
+package-lock.json
+*.py
+*.tsbuildinfo
+playwright-report
+test-results
+next-env.d.ts
+LICENSE
