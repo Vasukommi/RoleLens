@@ -272,6 +272,12 @@ export function CreateJobDialog({
                   <div className="criterion-assessment-mode">
                     {MODES[item.assessment_mode ?? "RESUME_EVIDENCE"]}
                   </div>
+                  {!!item.components?.length && (
+                    <p className="criterion-review-note">
+                      Match {item.component_operator === "ANY" ? "any" : "all"}:{" "}
+                      {item.components.join(" · ")}
+                    </p>
+                  )}
                   {item.review_note && <p className="criterion-review-note">{item.review_note}</p>}
                   {draft.validation[item.id] !== "GROUNDED" && (
                     <p className="criterion-review-note">

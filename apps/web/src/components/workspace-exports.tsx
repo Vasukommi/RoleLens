@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowDownToLine, FileText, LoaderCircle } from "lucide-react";
 import { Select } from "@/components/select";
@@ -101,6 +102,13 @@ export function WorkspaceExports({ job }: { job: Job }) {
 
   return (
     <>
+      <article className="job-card export-card">
+        <h2>Approved shortlist exports</h2>
+        <p>Download the approved shortlist CSV and original resumes from matching results.</p>
+        <Link className="button button-secondary" href={`/shortlists?job=${job.id}`}>
+          Open shortlist exports
+        </Link>
+      </article>
       <article className="job-card export-card">
         <FileText size={22} />
         <h2>Application review CSV</h2>

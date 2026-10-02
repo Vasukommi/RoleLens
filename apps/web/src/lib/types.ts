@@ -7,8 +7,19 @@ export type Finding = {
   evidence: Passage | null;
   confidence: number | null;
   probabilities: Record<string, number> | null;
+  reason?: string | null;
+  method?: string;
+  duration_months?: number | null;
+  evidence_passages?: Passage[];
+  components?: { label: string; status: EvidenceStatus; evidence_ids: string[] }[];
 };
-export type Assessment = { findings: Finding[]; model: string; is_sample: boolean };
+export type Assessment = {
+  findings: Finding[];
+  model: string;
+  is_sample: boolean;
+  protocol?: string;
+  assessed_at?: string | null;
+};
 export type Candidate = {
   id: string;
   name: string;
