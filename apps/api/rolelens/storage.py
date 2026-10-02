@@ -24,6 +24,7 @@ from sqlalchemy import (
     create_engine,
     delete,
     event,
+    false,
     func,
     insert,
     or_,
@@ -74,9 +75,13 @@ applications = Table(
     Column("dedupe_key", String(64), nullable=False),
     Column("fingerprint", String(64), nullable=False),
     Column("payload", LargeBinary),
+    Column("original_document", LargeBinary),
     Column("text", Text),
     Column("extraction_method", String(8)),
     Column("assessment", JSON),
+    Column("screening", JSON),
+    Column("shortlisted", Boolean, nullable=False, server_default=false()),
+    Column("shortlist_approval", JSON),
     Column("overrides", JSON, nullable=False),
     Column("notes", Text, nullable=False),
     Column("reviewed", Boolean, nullable=False),
@@ -108,9 +113,21 @@ workers = Table(
     Column("id", String(36), primary_key=True),
     Column("heartbeat", Float, nullable=False),
 )
+assessment_history = Table(
+    "assessment_history",
+    metadata,
+    Column("id", String(36), primary_key=True),
+    Column("application_id", ForeignKey("applications.id", ondelete="CASCADE"), nullable=False),
+    Column("snapshot", JSON, nullable=False),
+    Column("created_at", Float, nullable=False),
+)
 
 
 class IntakeConflict(ValueError):
+    pass
+
+
+class DocumentBundleTooLarge(ValueError):
     pass
 
 
@@ -290,6 +307,9 @@ class Store:
                                 payload=payload,
                                 text=text,
                                 assessment=None,
+                                original_document=payload,
+                                screening=None,
+                                shortlisted=False,
                                 overrides={},
                                 notes="",
                                 reviewed=False,
@@ -410,7 +430,15 @@ class Store:
         if row is None:
             raise KeyError("Application not found.")
         data = dict(row)
-        for key in ("payload", "dedupe_key", "fingerprint", "lease_token", "lease_until"):
+        data["document_available"] = data["original_document"] is not None
+        for key in (
+            "payload",
+            "original_document",
+            "dedupe_key",
+            "fingerprint",
+            "lease_token",
+            "lease_until",
+        ):
             data.pop(key)
         return data
 
@@ -423,6 +451,11 @@ class Store:
             raise IntakeConflict("Correction refers to an unknown role requirement.")
         if overrides and not application["assessment"]:
             raise IntakeConflict("There is no assessment to correct.")
+        from rolelens.comparison import evidence_summary
+
+        screening = evidence_summary(
+            self.job(application["job_id"])["requirements"], application["assessment"], overrides
+        )
         with self.engine.begin() as connection:
             result = connection.execute(
                 update(applications)
@@ -431,6 +464,9 @@ class Store:
                     notes=notes,
                     reviewed=reviewed,
                     overrides=overrides,
+                    screening=screening,
+                    shortlisted=False,
+                    shortlist_approval=None,
                     updated_at=time.time(),
                     version=applications.c.version + 1,
                 )
@@ -530,7 +566,232 @@ class Store:
             )
 
     def finish(self, row: dict, status: str, **values) -> bool:
+        if values.get("assessment"):
+            from rolelens.comparison import evidence_summary
+
+            values["screening"] = evidence_summary(row["requirements"], values["assessment"])
         return self.leased_update(row, status=status, lease_token=None, lease_until=None, **values)
+
+    def comparison(
+        self,
+        job_id: str,
+        *,
+        page=1,
+        search="",
+        scope="",
+        limit=50,
+        criterion_id="",
+        finding_status="SUPPORTED",
+    ):
+        from rolelens.comparison import evidence_summary
+
+        job = self.job(job_id)
+        where = [applications.c.job_id == job_id]
+        if criterion_id:
+            if criterion_id not in {r["id"] for r in job["requirements"]}:
+                raise IntakeConflict("The criterion does not belong to this job.")
+            where.append(
+                applications.c.screening["findings"][criterion_id].as_string() == finding_status
+            )
+        if search:
+            where.append(func.lower(applications.c.name).contains(search.lower(), autoescape=True))
+        if scope == "SHORTLISTED":
+            where.append(applications.c.shortlisted.is_(True))
+        elif scope == "COMPLETE":
+            where.append(applications.c.screening["required_complete"].as_boolean().is_(True))
+        elif scope == "UNRESOLVED":
+            where.append(applications.c.screening["unresolved"].as_integer() > 0)
+        columns = [
+            applications.c[k]
+            for k in (
+                "id",
+                "name",
+                "filename",
+                "source",
+                "status",
+                "version",
+                "shortlisted",
+                "screening",
+                "assessment",
+                "overrides",
+            )
+        ]
+        with self.engine.connect() as c:
+            total = c.scalar(select(func.count()).select_from(applications).where(*where))
+            rows = (
+                c.execute(
+                    select(*columns)
+                    .where(*where)
+                    .order_by(applications.c.created_at.desc(), applications.c.id)
+                    .offset((page - 1) * limit)
+                    .limit(limit)
+                )
+                .mappings()
+                .all()
+            )
+            counts = dict(
+                c.execute(
+                    select(applications.c.status, func.count())
+                    .where(applications.c.job_id == job_id)
+                    .group_by(applications.c.status)
+                ).all()
+            )
+            selected = c.scalar(
+                select(func.count())
+                .select_from(applications)
+                .where(applications.c.job_id == job_id, applications.c.shortlisted.is_(True))
+            )
+        items = []
+        for row in rows:
+            item = dict(row)
+            item["screening"] = evidence_summary(
+                job["requirements"], item.pop("assessment"), item.pop("overrides")
+            )
+            items.append(item)
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "statuses": counts,
+            "shortlisted": selected,
+        }
+
+    def approve_shortlist(self, job_id: str, selections: list[dict]):
+        from rolelens.matching import PROTOCOL
+
+        self.job(job_id)
+        with self.engine.begin() as c:
+            for choice in selections:
+                row = (
+                    c.execute(
+                        select(applications).where(
+                            applications.c.id == choice["id"], applications.c.job_id == job_id
+                        )
+                    )
+                    .mappings()
+                    .first()
+                )
+                if row is None or row["status"] != "READY" or row["version"] != choice["version"]:
+                    raise IntakeConflict(
+                        "A selected assessment changed or is unavailable. Refresh before approving."
+                    )
+                if not row["assessment"] or row["assessment"].get("protocol") != PROTOCOL:
+                    raise IntakeConflict("Refresh matching before approving an older assessment.")
+                updated = c.execute(
+                    update(applications)
+                    .where(
+                        applications.c.id == choice["id"],
+                        applications.c.version == choice["version"],
+                        applications.c.status == "READY",
+                    )
+                    .values(
+                        shortlisted=True,
+                        shortlist_approval={
+                            "assessment_version": choice["version"],
+                            "approved_at": time.time(),
+                            "evidence_reviewed": True,
+                        },
+                        version=applications.c.version + 1,
+                        updated_at=time.time(),
+                    )
+                ).rowcount
+                if updated != 1:
+                    raise IntakeConflict("Assessment changed. Refresh before approving.")
+        return {"approved": len(selections)}
+
+    def reassess(self, job_id: str):
+        self.job(job_id)
+        with self.engine.begin() as c:
+            rows = (
+                c.execute(
+                    select(applications)
+                    .where(
+                        applications.c.job_id == job_id,
+                        applications.c.status.in_(["READY", "FAILED"]),
+                    )
+                    .with_for_update()
+                )
+                .mappings()
+                .all()
+            )
+            count = 0
+            for row in rows:
+                if row["text"] is None:
+                    continue
+                changed = c.execute(
+                    update(applications)
+                    .where(applications.c.id == row["id"], applications.c.version == row["version"])
+                    .values(
+                        status="QUEUED",
+                        assessment=None,
+                        screening=None,
+                        shortlisted=False,
+                        shortlist_approval=None,
+                        reviewed=False,
+                        overrides={},
+                        attempts=0,
+                        next_attempt=0,
+                        error=None,
+                        version=applications.c.version + 1,
+                        updated_at=time.time(),
+                    )
+                ).rowcount
+                if not changed:
+                    raise IntakeConflict("An application changed. Retry the refresh.")
+                c.execute(
+                    insert(assessment_history).values(
+                        id=str(uuid4()),
+                        application_id=row["id"],
+                        snapshot={
+                            k: row[k]
+                            for k in (
+                                "assessment",
+                                "overrides",
+                                "reviewed",
+                                "shortlist_approval",
+                                "version",
+                            )
+                        },
+                        created_at=time.time(),
+                    )
+                )
+                count += 1
+        return {"queued": count}
+
+    def original(self, application_id: str):
+        with self.engine.connect() as c:
+            row = c.execute(
+                select(applications.c.filename, applications.c.original_document).where(
+                    applications.c.id == application_id
+                )
+            ).first()
+        if row is None or row.original_document is None:
+            raise KeyError("Original document unavailable.")
+        return row.filename, row.original_document
+
+    def shortlist_documents(self, job_id: str):
+        self.job(job_id)
+        with self.engine.connect() as c:
+            sizes = c.execute(
+                select(
+                    applications.c.id, func.length(applications.c.original_document).label("size")
+                )
+                .where(applications.c.job_id == job_id, applications.c.shortlisted.is_(True))
+                .limit(101)
+            ).all()
+            if len(sizes) > 100:
+                return sizes  # The endpoint rejects oversized counts before reading document bytes.
+            if sum(row.size or 0 for row in sizes) > 50 * 1024 * 1024:
+                raise DocumentBundleTooLarge(
+                    "The selected documents exceed the 50 MB download limit."
+                )
+            rows = c.execute(
+                select(
+                    applications.c.id, applications.c.filename, applications.c.original_document
+                ).where(applications.c.id.in_([row.id for row in sizes]))
+            ).all()
+        return rows
 
     def worker_heartbeat(self, worker_id: str):
         with self.engine.begin() as connection:

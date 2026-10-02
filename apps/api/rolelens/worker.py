@@ -91,19 +91,29 @@ async def run():
     provider = JevProvider(settings)
     worker_id = str(uuid4())
     logger.info("Application worker started; model configured: %s", settings.assessment_available)
-    while True:
-        try:
-            await asyncio.to_thread(store.worker_heartbeat, worker_id)
-            row = await asyncio.to_thread(
-                store.claim, settings.assessment_available, settings.worker_lease_seconds
-            )
-            if row:
-                await process(store, settings, row, provider, worker_id)
-            else:
-                await asyncio.sleep(1)
-        except Exception:
-            logger.error("Worker database unavailable. Check migrations and database connectivity.")
-            await asyncio.sleep(5)
+    active = set()
+    try:
+        while True:
+            active = {task for task in active if not task.done()}
+            try:
+                await asyncio.to_thread(store.worker_heartbeat, worker_id)
+                while len(active) < settings.worker_concurrency:
+                    row = await asyncio.to_thread(
+                        store.claim, settings.assessment_available, settings.worker_lease_seconds
+                    )
+                    if not row:
+                        break
+                    active.add(
+                        asyncio.create_task(process(store, settings, row, provider, worker_id))
+                    )
+                await asyncio.sleep(0.5 if active else 1)
+            except Exception:
+                logger.error("Worker database unavailable. Check migrations and connectivity.")
+                await asyncio.sleep(5)
+    finally:
+        for task in active:
+            task.cancel()
+        await asyncio.gather(*active, return_exceptions=True)
 
 
 if __name__ == "__main__":

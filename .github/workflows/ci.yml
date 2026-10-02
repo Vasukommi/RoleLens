@@ -44,7 +44,7 @@ jobs:
         working-directory: apps/api
         env:
           DATABASE_URL: postgresql+psycopg://rolelens:synthetic-test-password@localhost:5432/rolelens_test
-      - run: uv run pytest tests/test_intake.py
+      - run: uv run pytest tests/test_intake.py tests/test_screening.py
         working-directory: apps/api
         env:
           TEST_DATABASE_URL: postgresql+psycopg://rolelens:synthetic-test-password@localhost:5432/rolelens_test

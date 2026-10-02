@@ -5,13 +5,10 @@ import httpx
 from pydantic import ValidationError
 
 from rolelens.config import Settings
-from rolelens.documents import make_passages, normalize_text
 from rolelens.schemas import (
     Assessment,
     AssessmentRequest,
     ChoiceAnswer,
-    EvidenceStatus,
-    Finding,
 )
 
 RUBRIC = {
@@ -101,7 +98,10 @@ class JevProvider:
         questions = {}
         proposals = {}
         for item in requirements:
-            proposals[item["id"]] = {key: item[key] for key in ("text", "source_quote", "priority")}
+            proposals[item["id"]] = {
+                key: item.get(key)
+                for key in ("text", "source_quote", "priority", "components", "component_operator")
+            }
             questions[item["id"]] = {
                 "type": "choice",
                 "instructions": (
@@ -110,6 +110,9 @@ class JevProvider:
                     "the full job description, without invented skills, thresholds, changed AND/OR "
                     "logic, lost exemptions, or unsupported mandatory/preferred status. "
                     "UNSPECIFIED does not assert importance. "
+                    "PREFERRED includes explicit Preferred Qualifications, Nice to Have, "
+                    "and Good to Have sections. REQUIRED includes Required Skills and Must Have. "
+                    "Check components and ALL/ANY logic for invented or lost constraints. "
                     "An uncertain interpretation needs review. "
                     "Protected personal traits, personality, culture fit, and employer prestige "
                     "are not acceptable resume criteria and require REVIEW. "
@@ -132,95 +135,8 @@ class JevProvider:
         }
 
     async def assess(self, request: AssessmentRequest) -> Assessment:
+        from rolelens.evidence_matcher import assess_evidence
+
         if not self.settings.assessment_available:
-            raise ProviderError(
-                "Configure TYPESAFE_API_KEY on the backend to assess uploaded resumes."
-            )
-        text = normalize_text(request.resume_text)
-        passages = make_passages(text)
-        by_id = {passage.id: passage for passage in passages}
-        # First retrieve a source passage for each criterion from the whole resume.
-        selections = {}
-        findings = {}
-        for index, requirement in enumerate(request.requirements):
-            if requirement.assessment_mode != "RESUME_EVIDENCE":
-                findings[index] = Finding(
-                    requirement_id=requirement.id, status=EvidenceStatus.UNCLEAR
-                )
-                continue
-            selections[f"e{index}"] = {
-                "type": "choice",
-                "instructions": BOUNDARY
-                + "Choose the passage most directly relevant to this requirement: "
-                + f"{requirement.text!r}. "
-                + "Choose NONE when no passage addresses it. Skills-list mentions can be relevant.",
-                "criteria": {
-                    "NONE": "No source passage mentions the requirement.",
-                    **{p.id: f"Source passage {p.id} in state.passages" for p in passages},
-                },
-            }
-        model, evidence_answers = self.settings.typesafe_model, {}
-        if selections:
-            model, evidence_answers = await self._evaluate(
-                {"passages": [p.model_dump() for p in passages]}, selections
-            )
-        # Then classify against the chosen source, so a finding cannot cite unrelated evidence.
-        checks = {}
-        selected = {}
-        for index, requirement in enumerate(request.requirements):
-            if index in findings:
-                continue
-            answer = evidence_answers[f"e{index}"]
-            passage = by_id.get(answer.choice)
-            if answer.confidence < self.settings.model_confidence_floor:
-                findings[index] = Finding(
-                    requirement_id=requirement.id,
-                    status=EvidenceStatus.UNCLEAR,
-                    evidence=passage,
-                    confidence=answer.confidence,
-                )
-            elif passage is None:
-                findings[index] = Finding(
-                    requirement_id=requirement.id,
-                    status=EvidenceStatus.NOT_MENTIONED,
-                    confidence=answer.confidence,
-                )
-            else:
-                selected[f"r{index}"] = {
-                    "requirement": requirement.text,
-                    "source": passage.text,
-                    "review_note": requirement.review_note,
-                }
-                checks[f"r{index}"] = {
-                    "type": "choice",
-                    "instructions": BOUNDARY
-                    + f"Evaluate only state.r{index}.source against state.r{index}.requirement. "
-                    + "A bare skills-list mention is PARTIAL. "
-                    + "Preserve alternatives, exemptions, and allowed project evidence. "
-                    + "Do not claim an unspecified proficiency threshold has been established. "
-                    + "Use UNCLEAR for numerical tenure requirements.",
-                    "criteria": RUBRIC,
-                }
-        if checks:
-            model, statuses = await self._evaluate(selected, checks)
-            for index, requirement in enumerate(request.requirements):
-                if index in findings:
-                    continue
-                answer = statuses[f"r{index}"]
-                passage = by_id[evidence_answers[f"e{index}"].choice]
-                status = EvidenceStatus(answer.choice)
-                if answer.confidence < self.settings.model_confidence_floor:
-                    status = EvidenceStatus.UNCLEAR
-                if status == EvidenceStatus.NOT_MENTIONED:
-                    # The selected passage was irrelevant; don't infer absence from that passage.
-                    status = EvidenceStatus.UNCLEAR
-                findings[index] = Finding(
-                    requirement_id=requirement.id,
-                    status=status,
-                    evidence=passage,
-                    confidence=answer.confidence,
-                    probabilities=answer.probabilities,
-                )
-        return Assessment(
-            findings=[findings[i] for i in range(len(request.requirements))], model=model
-        )
+            raise ProviderError("Configure TYPESAFE_API_KEY on the backend to assess resumes.")
+        return await assess_evidence(self, request)

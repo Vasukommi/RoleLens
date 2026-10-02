@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     intake_api_key: SecretStr = SecretStr("")
     worker_lease_seconds: int = Field(default=90, ge=30, le=900)
     worker_max_attempts: int = Field(default=4, ge=1, le=10)
+    worker_concurrency: int = Field(default=2, ge=1, le=8)
 
     @property
     def assessment_available(self) -> bool:
