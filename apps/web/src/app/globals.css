@@ -1,0 +1,148 @@
+@import url("./workspace.css");
+
+:root {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --ink: #202327;
+  --muted: #6b7078;
+  --line: #e6e8eb;
+  --accent: #24272c;
+  --selection: #f0f3fa;
+  --selection-ink: #3b5593;
+  --sidebar: #f8f9fb;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  cursor: pointer;
+  color: inherit;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+a {
+  color: inherit;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #5875b8;
+  outline-offset: 3px;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 2px solid #5875b8;
+  outline-offset: 1px;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+svg {
+  flex-shrink: 0;
+}
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.button-primary {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.button-primary:hover:not(:disabled) {
+  background: #40444b;
+}
+.button-secondary {
+  background: #fff;
+  border-color: #dce0e5;
+}
+.button-secondary:hover:not(:disabled) {
+  background: #f6f7f9;
+}
+.button-reviewed {
+  background: #f0f7f2;
+  color: #37674b;
+  border-color: #d7e7dc;
+}
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  padding: 8px;
+  border-radius: 5px;
+  color: var(--muted);
+}
+.icon-button:hover:not(:disabled) {
+  background: #eef0f3;
+}
+.text-button {
+  color: var(--muted);
+  border: 0;
+  background: transparent;
+  padding: 5px 0;
+  font-size: 12px;
+}
+.text-button:hover:not(:disabled) {
+  color: var(--ink);
+  text-decoration: underline;
+}
+.eyebrow {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

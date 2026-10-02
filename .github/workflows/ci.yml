@@ -1,0 +1,79 @@
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: "0.12.3"
+          python-version: "3.13"
+      - run: uv sync --frozen
+        working-directory: apps/api
+      - run: uv run ruff check .
+        working-directory: apps/api
+      - run: uv run ruff format --check .
+        working-directory: apps/api
+      - run: uv run pytest
+        working-directory: apps/api
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: "0.12.3"
+          python-version: "3.13"
+      - run: npm ci
+      - run: uv sync --frozen
+        working-directory: apps/api
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v7.0.1
+        if: failure()
+        with:
+          name: browser-traces
+          path: apps/web/test-results
+          retention-days: 7
+  containers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - run: docker compose config --quiet
+      - run: docker compose up --build --wait --wait-timeout 180
+      - run: curl --fail --retry 10 --retry-delay 3 --retry-all-errors http://127.0.0.1:3000/api/backend/health
+      - run: curl --fail http://127.0.0.1:3000
+      - run: docker compose logs
+        if: failure()
+      - run: docker compose down
+        if: always()
