@@ -26,7 +26,7 @@ Run the checks documented in the README for the affected application. Meaningful
 
 ## Candidate data and assessment behavior
 
-Use invented names and synthetic resumes in fixtures, screenshots, and issue reports. Never commit credentials or real resumes. Assess explicit job-related requirements, preserve uncertainty, and keep source references inspectable. Missing evidence is not proof of missing ability. Do not add automatic hiring or rejection decisions.
+Use invented names and synthetic resumes in fixtures, screenshots, and issue reports. Never commit credentials or real resumes. Assess explicit job-related requirements, preserve uncertainty, and keep source references inspectable. Missing evidence is not proof of missing ability. Automatic shortlist selection must use explicit, configurable screening rules, preserve unresolved findings, and distinguish resume evidence from verified ability.
 
 ## License
 

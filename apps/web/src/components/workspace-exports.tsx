@@ -103,8 +103,8 @@ export function WorkspaceExports({ job }: { job: Job }) {
   return (
     <>
       <article className="job-card export-card">
-        <h2>Approved shortlist exports</h2>
-        <p>Download the approved shortlist CSV and original resumes from matching results.</p>
+        <h2>Automatic shortlist exports</h2>
+        <p>Download the automatic shortlist CSV and original resumes from matching results.</p>
         <Link className="button button-secondary" href={`/shortlists?job=${job.id}`}>
           Open shortlist exports
         </Link>

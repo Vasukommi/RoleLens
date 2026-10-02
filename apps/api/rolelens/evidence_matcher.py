@@ -37,6 +37,14 @@ async def assess_evidence(provider, request) -> Assessment:
     periods = [p for p in employment_periods(text, today) if not INJECTION.search(p["quote"])]
     units, groups, durations, findings = [], {}, {}, {}
     for index, requirement in enumerate(request.requirements):
+        if requirement.source_validation == "REVIEW":
+            findings[index] = Finding(
+                requirement_id=requirement.id,
+                status=EvidenceStatus.UNCLEAR,
+                method="separate_verification",
+                reason="The job criterion could not be verified against the source description.",
+            )
+            continue
         minimum = minimum_months(requirement.text)
         if minimum is not None and requirement.assessment_mode != "INTERVIEW":
             durations[index] = (minimum, [])

@@ -6,6 +6,7 @@ export type JobRequirement = {
   assessment_mode?: "RESUME_EVIDENCE" | "VERIFY_SEPARATELY" | "INTERVIEW";
   components?: string[];
   component_operator?: "ALL" | "ANY";
+  source_validation?: "GROUNDED" | "REVIEW" | "EMPLOYER_AUTHORED";
   source_quote?: string | null;
   review_note?: string | null;
 };
@@ -19,16 +20,30 @@ export type JobInterpretation = {
   prompt_version: string;
   cached: boolean;
 };
+export type ScreeningPolicy = { threshold: number; criterion_ids: string[] };
+export type SelectionResult = {
+  status: "SHORTLISTED" | "NOT_MATCHED" | "INCONCLUSIVE" | "PENDING" | "FAILED";
+  reason: string;
+  matched: number;
+  total: number;
+  unresolved: number;
+  percentage: number | null;
+  threshold: number;
+};
 export type Job = {
   id: string;
   title: string;
   requirements: JobRequirement[];
+  screening_policy: ScreeningPolicy;
+  policy_version: number;
   description?: string | null;
   interpretation?: JobInterpretation | null;
 };
 export type Application = {
   document_available?: boolean;
   shortlisted?: boolean;
+  selection?: SelectionResult;
+  screening?: { findings: Record<string, EvidenceStatus> } | null;
   id: string;
   job_id: string;
   name: string;

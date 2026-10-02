@@ -66,3 +66,32 @@ def test_ambiguous_or_exempted_duration_does_not_become_a_numeric_gate():
     assert minimum_months("4 years experience and 2 years Node.js experience") is None
     assert minimum_months("0 years experience") is None
     assert minimum_months("0.3 years experience") == 4
+
+
+def test_unverified_minimum_years_is_not_sent_for_tenure_assessment():
+    import asyncio
+    from types import SimpleNamespace
+
+    from rolelens.evidence_matcher import assess_evidence
+    from rolelens.schemas import AssessmentRequest
+
+    class Provider:
+        settings = SimpleNamespace(typesafe_model="synthetic", model_confidence_floor=0.65)
+
+        async def _evaluate(self, *_args):
+            raise AssertionError("Unverified JD criteria must not become tenure questions.")
+
+    request = AssessmentRequest(
+        resume_text="Experience\nEngineer\nJan 2020 - Dec 2025\nBuilt React applications.",
+        requirements=[
+            {
+                "id": "years",
+                "text": "Minimum 3 years React experience",
+                "assessment_mode": "VERIFY_SEPARATELY",
+                "source_validation": "REVIEW",
+            }
+        ],
+    )
+    assessment = asyncio.run(assess_evidence(Provider(), request))
+    assert assessment.findings[0].status == S.UNCLEAR
+    assert assessment.findings[0].method == "separate_verification"

@@ -1,4 +1,4 @@
-"""Transparent evidence counts. No candidate fitness probabilities or automatic selection."""
+"""Evidence counts used by deterministic screening rules."""
 
 from rolelens.matching import PROTOCOL
 
@@ -16,17 +16,22 @@ def evidence_summary(requirements: list[dict], assessment: dict | None, override
         for priority in ("REQUIRED", "PREFERRED", "UNSPECIFIED")
     }
     by_id = {f["requirement_id"]: f for f in (assessment or {}).get("findings", [])}
+    effective = {}
     for requirement in requirements:
         group = result[requirement.get("priority", "UNSPECIFIED")]
         group["total"] += 1
         finding = by_id.get(requirement["id"], {})
         status = (overrides or {}).get(requirement["id"], finding.get("status", "UNCLEAR"))
+        if requirement.get("source_validation") == "REVIEW":
+            status = "UNCLEAR"
+        effective[requirement["id"]] = status
         group[status.lower()] += 1
         if finding.get("method") == "separate_verification" or (
             requirement.get("assessment_mode", "RESUME_EVIDENCE") != "RESUME_EVIDENCE"
             and finding.get("method") != "dated_employment"
         ):
             group["verification"] += 1
+    result["is_sample"] = bool((assessment or {}).get("is_sample", False))
     result["protocol"] = (assessment or {}).get("protocol", "legacy-single-passage")
     result["needs_refresh"] = assessment is not None and result["protocol"] != PROTOCOL
     result["required_complete"] = result["REQUIRED"]["total"] > 0 and (
@@ -35,7 +40,5 @@ def evidence_summary(requirements: list[dict], assessment: dict | None, override
     result["unresolved"] = sum(
         g["unclear"] for g in [result[p] for p in ("REQUIRED", "PREFERRED", "UNSPECIFIED")]
     )
-    result["findings"] = {
-        key: (overrides or {}).get(key, finding["status"]) for key, finding in by_id.items()
-    }
+    result["findings"] = effective
     return result

@@ -80,9 +80,9 @@ def list_jobs(store: Database):
 def create_job(request: NewJob, store: Database):
     requirements = [r.model_dump() for r in request.requirements]
     if request.interpretation_id is None:
+        for item in requirements:
+            item["source_validation"] = "EMPLOYER_AUTHORED"
         return store.create_job(request.title, requirements)
-    if not request.interpretation_reviewed:
-        raise HTTPException(422, "Review and confirm the interpretation before creating the job.")
     draft = store.interpretation(str(request.interpretation_id))
     if request.title != draft["title"]:
         raise HTTPException(409, "The title changed after analysis. Analyze the description again.")
@@ -97,6 +97,11 @@ def create_job(request: NewJob, store: Database):
         item["components"] = original.get("components", [])
         item["component_operator"] = original.get("component_operator", "ALL")
         text_changed = item["text"] != original["text"]
+        item["source_validation"] = (
+            "EMPLOYER_AUTHORED"
+            if text_changed
+            else draft["result"]["validation"].get(item["id"], "REVIEW")
+        )
         if text_changed:
             item["components"] = []
         if text_changed or item["priority"] != original["priority"]:
@@ -117,7 +122,7 @@ def create_job(request: NewJob, store: Database):
     snapshot = {
         **draft["result"],
         "id": draft["id"],
-        "reviewed": True,
+        "reviewed": request.interpretation_reviewed,
         "edited_criteria": edits,
         "approved_requirements": requirements,
         "version": 1,

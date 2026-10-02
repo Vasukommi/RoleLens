@@ -84,7 +84,7 @@ for name, has_typescript in [('Alex Fixture', True), ('Sam Fixture', False)]:
                            payload=text.encode(), source='synthetic_fixture')
     row = store.claim(False, 90)
     assert row['id'] == receipt['id']
-    assessment = Assessment(model='synthetic-browser-fixture', is_sample=True,
+    assessment = Assessment(model='synthetic-browser-fixture', is_sample=False,
         protocol=PROTOCOL, findings=[
             Finding(requirement_id='react', status='SUPPORTED',
                     evidence=Passage(id='p1', text=text),

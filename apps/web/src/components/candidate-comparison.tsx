@@ -1,19 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ArrowDownToLine,
-  ChevronLeft,
-  ChevronRight,
-  LoaderCircle,
-  RefreshCw,
-  Search,
-  X,
-} from "lucide-react";
+import { ArrowDownToLine, ChevronLeft, ChevronRight, RefreshCw, Search, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { Select } from "@/components/select";
-import { downloadText } from "@/lib/download";
-import type { Application, Job } from "@/lib/inbox-types";
+import type { Application, Job, ScreeningPolicy, SelectionResult } from "@/lib/inbox-types";
 import { STATUS_LABELS } from "@/lib/types";
 
 type Counts = {
@@ -39,6 +30,7 @@ type Row = {
   version: number;
   shortlisted: boolean;
   screening: Summary;
+  selection: SelectionResult;
 };
 type Listing = {
   items: Row[];
@@ -46,6 +38,8 @@ type Listing = {
   page: number;
   statuses: Record<string, number>;
   shortlisted: number;
+  screening_policy: ScreeningPolicy;
+  policy_version: number;
 };
 
 async function download(route: string, filename: string) {
@@ -73,10 +67,10 @@ export function CandidateComparison({ job }: { job: Job }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [checked, setChecked] = useState<string[]>([]);
   const [preview, setPreview] = useState<Application[]>([]);
-  const [confirmed, setConfirmed] = useState(false);
-  const [approving, setApproving] = useState(false);
+  const [policyDraft, setPolicyDraft] = useState<(ScreeningPolicy & { version: number }) | null>(
+    null,
+  );
   const dialog = useRef<HTMLDialogElement>(null);
   const sequence = useRef(0);
   const refresh = useCallback(async () => {
@@ -111,41 +105,34 @@ export function CandidateComparison({ job }: { job: Job }) {
   }, [preview]);
   function closePreview() {
     setPreview([]);
-    setConfirmed(false);
-    setApproving(false);
     dialog.current?.close();
   }
-  async function inspect(ids: string[], approve: boolean) {
+  async function inspect(ids: string[]) {
     setBusy(true);
     setError("");
     try {
       const records: Application[] = [];
       for (const id of ids) records.push(await api<Application>(`applications/${id}`));
       setPreview(records);
-      setConfirmed(false);
-      setApproving(approve);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
-  async function approve() {
-    if (!confirmed || !approving) return;
+  async function savePolicy() {
+    if (!policyDraft) return;
     setBusy(true);
     setError("");
     try {
-      await api(`jobs/${job.id}/shortlist`, {
-        method: "POST",
+      await api(`jobs/${job.id}/screening-policy`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          selections: preview.map((r) => ({ id: r.id, version: r.version })),
-          evidence_reviewed: true,
-        }),
+        body: JSON.stringify(policyDraft),
       });
-      setNotice(`Approved ${preview.length} applications for your shortlist.`);
-      closePreview();
-      setChecked([]);
+      setPolicyDraft(null);
+      setPage(1);
+      setNotice("Screening rules saved. The shortlist now uses these rules.");
       await refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -159,61 +146,9 @@ export function CandidateComparison({ job }: { job: Job }) {
     try {
       const result = await api<{ queued: number }>(`jobs/${job.id}/reassess`, { method: "POST" });
       setNotice(
-        `Queued ${result.queued} resumes for refreshed matching. Previous assessments are archived; previous shortlist approvals are cleared.`,
+        `Queued ${result.queued} resumes for refreshed matching. Previous assessments are archived; applicants qualify again after reassessment.`,
       );
-      setChecked([]);
       await refresh();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function exportCsv() {
-    setBusy(true);
-    setError("");
-    try {
-      const rows: Row[] = [];
-      let n = 1;
-      while (true) {
-        const next = await api<Listing>(`jobs/${job.id}/comparison?scope=SHORTLISTED&page=${n}`);
-        rows.push(...next.items);
-        if (rows.length >= next.total || !next.items.length) break;
-        n++;
-      }
-      if (!rows.length) throw new Error("Approve a shortlist before exporting it.");
-      const cell = (value: string | number) =>
-        `"${String(value)
-          .replace(/^[=+@\-\t\r]/, "'$&")
-          .replaceAll('"', '""')}"`;
-      const lines = [
-        [
-          "Applicant",
-          "File",
-          "Required supported",
-          "Required total",
-          "Required partial",
-          "Preferred supported",
-          "Preferred total",
-          "Unresolved",
-          "Human approved",
-        ],
-        ...rows.map((r) => [
-          r.name,
-          r.filename,
-          r.screening.REQUIRED.supported,
-          r.screening.REQUIRED.total,
-          r.screening.REQUIRED.partial,
-          r.screening.PREFERRED.supported,
-          r.screening.PREFERRED.total,
-          r.screening.unresolved,
-          "Yes",
-        ]),
-      ];
-      downloadText(
-        lines.map((r) => r.map(cell).join(",")).join("\r\n"),
-        `rolelens-${job.id.slice(0, 8)}-shortlist.csv`,
-      );
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -229,9 +164,8 @@ export function CandidateComparison({ job }: { job: Job }) {
       <div className="comparison-intro">
         <h2>Matching results</h2>
         <p>
-          Evidence is matched automatically. Compare required and preferred criteria, inspect
-          unresolved items, then approve a shortlist. Counts describe resume evidence, not verified
-          ability.
+          Resumes are shortlisted automatically using your screening rules. Download matching
+          resumes directly, or inspect the evidence when needed.
         </p>
       </div>
       <div className="inbox-metrics">
@@ -244,7 +178,7 @@ export function CandidateComparison({ job }: { job: Job }) {
           <strong>{inProgress}</strong>
         </div>
         <div>
-          <span>Approved shortlist</span>
+          <span>Automatic shortlist</span>
           <strong>{listing?.shortlisted ?? 0}</strong>
         </div>
         <div>
@@ -262,6 +196,112 @@ export function CandidateComparison({ job }: { job: Job }) {
           {notice}
         </p>
       )}
+      {listing && (
+        <section className="screening-policy" aria-label="Screening rules">
+          <div className="interpretation-heading">
+            <h3>Screening rules</h3>
+            <button
+              className="button button-secondary"
+              disabled={busy}
+              onClick={() =>
+                setPolicyDraft({ ...listing.screening_policy, version: listing.policy_version })
+              }
+            >
+              Adjust screening rules
+            </button>
+          </div>
+          <p>
+            Match at least {listing.screening_policy.threshold}% of{" "}
+            {listing.screening_policy.criterion_ids.length} selected criteria. Partial and unclear
+            evidence do not count as supported.
+          </p>
+          {!listing.screening_policy.criterion_ids.length && (
+            <p role="status">No screening criteria selected. No resumes can qualify.</p>
+          )}
+          <details>
+            <summary>View included and excluded criteria</summary>
+            {job.requirements.map((r) => (
+              <p key={r.id}>
+                {listing.screening_policy.criterion_ids.includes(r.id) ? "Included" : "Excluded"}:{" "}
+                {r.text}
+                {r.assessment_mode === "INTERVIEW"
+                  ? " · Interview assessment"
+                  : r.assessment_mode === "VERIFY_SEPARATELY"
+                    ? " · May need separate verification"
+                    : ""}
+              </p>
+            ))}
+          </details>
+          {policyDraft && (
+            <div className="screening-policy-editor">
+              <label className="form-label" htmlFor="match-threshold">
+                Minimum match percentage
+              </label>
+              <input
+                id="match-threshold"
+                className="form-input"
+                type="number"
+                min={1}
+                max={100}
+                step={1}
+                value={policyDraft.threshold}
+                disabled={busy}
+                onChange={(e) =>
+                  setPolicyDraft({ ...policyDraft, threshold: Number(e.target.value) })
+                }
+              />
+              <p>
+                Only fully supported criteria count. Excluded criteria do not affect the shortlist.
+              </p>
+              {job.requirements.map((r) => (
+                <label className="screening-policy-criterion" key={r.id}>
+                  <input
+                    type="checkbox"
+                    checked={policyDraft.criterion_ids.includes(r.id)}
+                    disabled={busy}
+                    onChange={(e) =>
+                      setPolicyDraft({
+                        ...policyDraft,
+                        criterion_ids: e.target.checked
+                          ? [...policyDraft.criterion_ids, r.id]
+                          : policyDraft.criterion_ids.filter((id) => id !== r.id),
+                      })
+                    }
+                  />
+                  {r.text}
+                  {r.assessment_mode === "INTERVIEW" && (
+                    <small>Interview evidence remains unresolved.</small>
+                  )}
+                </label>
+              ))}
+              <div className="comparison-actions">
+                <button
+                  className="button button-primary"
+                  disabled={
+                    busy ||
+                    !Number.isInteger(policyDraft.threshold) ||
+                    policyDraft.threshold < 1 ||
+                    policyDraft.threshold > 100
+                  }
+                  onClick={() => void savePolicy()}
+                >
+                  Save screening rules
+                </button>
+                <button
+                  className="button button-secondary"
+                  disabled={busy}
+                  onClick={() => setPolicyDraft(null)}
+                >
+                  Cancel changes
+                </button>
+                {listing.policy_version !== policyDraft.version && (
+                  <p>Rules changed elsewhere. Cancel changes to load the latest version.</p>
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
       <div className="inbox-toolbar comparison-toolbar">
         <label className="search-field">
           <Search size={16} />
@@ -272,7 +312,6 @@ export function CandidateComparison({ job }: { job: Job }) {
             onChange={(e) => {
               setSearch(e.target.value);
               setPage(1);
-              setChecked([]);
             }}
           />
         </label>
@@ -282,11 +321,10 @@ export function CandidateComparison({ job }: { job: Job }) {
           onValueChange={(v) => {
             setScope(v);
             setPage(1);
-            setChecked([]);
           }}
           options={[
             { value: "", label: "All applications" },
-            { value: "SHORTLISTED", label: "Approved shortlist" },
+            { value: "SHORTLISTED", label: "Automatic shortlist" },
             { value: "COMPLETE", label: "All required evidence supported" },
             { value: "UNRESOLVED", label: "Unresolved criteria" },
           ]}
@@ -297,7 +335,6 @@ export function CandidateComparison({ job }: { job: Job }) {
           onValueChange={(v) => {
             setCriterion(v);
             setPage(1);
-            setChecked([]);
           }}
           options={[
             { value: "", label: "Any criterion" },
@@ -311,7 +348,6 @@ export function CandidateComparison({ job }: { job: Job }) {
             onValueChange={(v) => {
               setFindingStatus(v);
               setPage(1);
-              setChecked([]);
             }}
             options={Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))}
           />
@@ -319,16 +355,13 @@ export function CandidateComparison({ job }: { job: Job }) {
       </div>
       <div className="comparison-actions">
         <button
-          className="button button-primary"
-          disabled={busy || !checked.length}
-          onClick={() => void inspect(checked, true)}
-        >
-          Review selection ({checked.length})
-        </button>
-        <button
           className="button button-secondary"
-          disabled={busy}
-          onClick={() => void exportCsv()}
+          disabled={busy || !listing?.shortlisted}
+          onClick={() =>
+            void download(`jobs/${job.id}/shortlist/csv`, "rolelens-shortlist.csv").catch((e) =>
+              setError(e.message),
+            )
+          }
         >
           <ArrowDownToLine size={14} />
           Shortlist CSV
@@ -355,14 +388,14 @@ export function CandidateComparison({ job }: { job: Job }) {
         </button>
       </div>
       <p className="comparison-explanation">
-        Refresh reuses extracted text and calls Jev, archives previous assessments, and clears
-        shortlist approvals. No application is automatically advanced or rejected.
+        Refresh calls Jev again using extracted text. Previous findings are archived and the
+        shortlist updates as new assessments complete. Changing screening rules does not call the
+        models.
       </p>
       <div className="inbox-table-wrap">
         <table className="inbox-table comparison-table">
           <thead>
             <tr>
-              <th>Select</th>
               <th>Applicant</th>
               <th>Required evidence</th>
               <th>Preferred evidence</th>
@@ -374,22 +407,7 @@ export function CandidateComparison({ job }: { job: Job }) {
             {listing?.items.map((row) => (
               <tr key={row.id}>
                 <td>
-                  <input
-                    type="checkbox"
-                    aria-label={`Select ${row.name}`}
-                    checked={checked.includes(row.id)}
-                    disabled={
-                      row.status !== "READY" || row.screening.needs_refresh || row.shortlisted
-                    }
-                    onChange={(e) =>
-                      setChecked((c) =>
-                        e.target.checked ? [...c, row.id] : c.filter((id) => id !== row.id),
-                      )
-                    }
-                  />
-                </td>
-                <td>
-                  <button onClick={() => void inspect([row.id], false)} disabled={busy}>
+                  <button onClick={() => void inspect([row.id])} disabled={busy}>
                     {row.name}
                     <span>{row.filename}</span>
                   </button>
@@ -428,13 +446,29 @@ export function CandidateComparison({ job }: { job: Job }) {
                   </small>
                 </td>
                 <td>
-                  {row.shortlisted ? <span className="review-done">Approved</span> : "Not selected"}
+                  <span className={row.shortlisted ? "review-done" : undefined}>
+                    {row.selection.status === "SHORTLISTED"
+                      ? "Shortlisted"
+                      : row.selection.status === "NOT_MATCHED"
+                        ? "Below threshold"
+                        : row.selection.status === "INCONCLUSIVE"
+                          ? "Inconclusive"
+                          : row.selection.status === "FAILED"
+                            ? "Processing failed"
+                            : "Processing"}
+                  </span>
+                  <small>
+                    {row.selection.percentage === null
+                      ? "No criteria selected"
+                      : `${row.selection.matched} / ${row.selection.total} · ${row.selection.percentage}% matched`}
+                  </small>
+                  <small>{row.selection.reason}</small>
                 </td>
               </tr>
             ))}
             {listing?.items.length === 0 && (
               <tr>
-                <td colSpan={6} className="inbox-empty">
+                <td colSpan={5} className="inbox-empty">
                   No applications match these filters.
                 </td>
               </tr>
@@ -454,7 +488,6 @@ export function CandidateComparison({ job }: { job: Job }) {
             disabled={page === 1}
             onClick={() => {
               setPage((p) => p - 1);
-              setChecked([]);
             }}
           >
             <ChevronLeft size={16} />
@@ -465,7 +498,6 @@ export function CandidateComparison({ job }: { job: Job }) {
             disabled={page * 50 >= (listing?.total ?? 0)}
             onClick={() => {
               setPage((p) => p + 1);
-              setChecked([]);
             }}
           >
             <ChevronRight size={16} />
@@ -475,14 +507,14 @@ export function CandidateComparison({ job }: { job: Job }) {
       <dialog
         ref={dialog}
         className="comparison-review-dialog"
-        aria-label="Shortlist evidence review"
+        aria-label="Matching evidence"
         onCancel={(e) => {
           if (busy) e.preventDefault();
           else closePreview();
         }}
       >
         <div className="dialog-header">
-          <h2>{approving ? "Review shortlist selection" : "Matching evidence"}</h2>
+          <h2>Matching evidence</h2>
           <button
             className="icon-button"
             aria-label="Close evidence review"
@@ -493,13 +525,18 @@ export function CandidateComparison({ job }: { job: Job }) {
           </button>
         </div>
         <p>
-          Inspect the evidence and unresolved requirements for each application. Approval is your
-          decision to include the application in a shortlist; it is not an automated hiring
-          decision.
+          Inspect the findings behind this automatic screening result. Reviewing evidence is
+          optional.
         </p>
         {preview.map((record) => (
           <article className="comparison-review-record" key={record.id}>
             <h3>{record.name}</h3>
+            {record.selection && (
+              <p>
+                {record.selection.matched} / {record.selection.total} screening criteria supported.{" "}
+                {record.selection.reason}
+              </p>
+            )}
             <p>
               {record.filename} · {record.extraction_method ?? "text"} extraction
             </p>
@@ -531,7 +568,10 @@ export function CandidateComparison({ job }: { job: Job }) {
               const finding = record.assessment?.findings.find(
                 (f) => f.requirement_id === requirement.id,
               );
-              const effectiveStatus = record.overrides[requirement.id] ?? finding?.status;
+              const effectiveStatus =
+                record.screening?.findings[requirement.id] ??
+                record.overrides[requirement.id] ??
+                finding?.status;
               return (
                 <details className="comparison-finding" key={requirement.id}>
                   <summary>
@@ -565,18 +605,6 @@ export function CandidateComparison({ job }: { job: Job }) {
             })}
           </article>
         ))}
-        {approving && (
-          <label className="interpretation-confirm">
-            <input
-              type="checkbox"
-              checked={confirmed}
-              disabled={busy}
-              onChange={(e) => setConfirmed(e.target.checked)}
-            />
-            I reviewed the relevant evidence and unresolved criteria for these applicants and
-            approve this shortlist selection.
-          </label>
-        )}
         {error && (
           <div role="alert" className="alert alert-error">
             {error}
@@ -586,15 +614,6 @@ export function CandidateComparison({ job }: { job: Job }) {
           <button className="button button-secondary" disabled={busy} onClick={closePreview}>
             Close
           </button>
-          {approving && (
-            <button
-              className="button button-primary"
-              disabled={!confirmed || busy}
-              onClick={() => void approve()}
-            >
-              {busy && <LoaderCircle size={14} />}Approve shortlist
-            </button>
-          )}
         </div>
       </dialog>
     </section>

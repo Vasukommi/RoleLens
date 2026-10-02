@@ -1,6 +1,6 @@
 # Job description interpretation
 
-Create a job by pasting the description you already use. **Analyze description** prepares criteria with original source quotes, required/preferred/unspecified importance, and assessment modes. Review the suggestions, change wording or priorities, deselect irrelevant items, and confirm before creating the job. This confirmation concerns the job definition; recruiters still make candidate advancement/rejection decisions.
+Create a job by pasting the description you already use. **Create job** prepares and saves criteria automatically. **Preview criteria** optionally prepares editable criteria with original source quotes, required/preferred/unspecified importance, and assessment modes. Optionally change wording or priorities and deselect irrelevant items before saving. No review confirmation is required. Resume screening and shortlist selection then run automatically under the job's screening rules.
 
 The manual criteria form remains available without OpenAI. Descriptions and titles changed after analysis invalidate the interpretation in the browser. The server also rejects a changed title and criteria IDs that do not belong to the saved interpretation.
 
@@ -39,9 +39,9 @@ Three assessment modes are retained:
 
 The [automatic matcher](automated-matching.md) now calculates conservative tenure bounds from explicitly associated dated employment. Summary claims, unsupported scope, education duration, exemptions, and ambiguous date associations remain unresolved. Fifteen years of full-time education is not converted to a bachelor's degree. An office location is not automatically an applicant residency requirement. Missing mentions are not proof of absent skills.
 
-Successful interpretations are cached durably by the exact description/title, prompt contents/version, and model/verification configuration. Cache hits do not repeat hosted calls. Concurrent requests can still make duplicate calls before the unique cache record is committed. Creating a job stores the original description, proposed interpretation, approved criteria, provider model IDs, prompt version, token usage, and criterion IDs with edited wording or priority. Source quotes are copied from the server's stored proposal rather than trusted from the creation request. Human edits have separate provenance; an AI validation result for the original proposal is not relabeled as validation of an edit.
+Successful interpretations are cached durably by the exact description/title, prompt contents/version, and model/verification configuration. Cache hits do not repeat hosted calls. Concurrent requests can still make duplicate calls before the unique cache record is committed. Creating a job stores the original description, proposed interpretation, saved criteria, provider model IDs, prompt version, token usage, and criterion IDs with edited wording or priority. Source quotes are copied from the server's stored proposal rather than trusted from the creation request. Human edits have separate provenance; an AI validation result for the original proposal is not relabeled as validation of an edit.
 
-Jobs remain immutable after creation. A changed JD needs a new job in this version. There is no authenticated per-editor audit history or automatic retrospective job-definition changes. An explicit evidence refresh archives prior assessments and re-evaluates the unchanged criteria.
+Criterion wording remains immutable after creation. Screening thresholds and included criteria can be edited at any time without repeating model assessment. A changed JD needs a new job in this version. There is no authenticated per-editor audit history or automatic retrospective job-definition changes. An explicit evidence refresh archives prior assessments and re-evaluates the unchanged criteria.
 
 ## Credentials and request limits
 
@@ -53,6 +53,6 @@ These controls **do not add user authentication** to the existing reviewer UI. T
 
 ## Validation and remaining work
 
-Automated checks cover invented quotes and numeric constraints, invalid schemas, incomplete output, refusals, provider error redaction, input limits, authorization, cache reuse, confirmation, source provenance, uncertain verification, and exclusions from automatic assessment. Browser tests use persisted synthetic interpretation fixtures with hosted calls disabled.
+Automated checks cover invented quotes and numeric constraints, invalid schemas, incomplete output, refusals, provider error redaction, input limits, authorization, cache reuse, automatic creation, source provenance, uncertain verification, and exclusions from automatic assessment. Browser tests use persisted synthetic interpretation fixtures with hosted calls disabled.
 
 Development smoke tests used the user-provided Accenture Full Stack Engineer JD and small synthetic cases for alternatives, freshers, and contradictory experience expectations. Those trials exposed duplicated skills and overasserted importance, which informed prompt and code changes. They are not a held-out quality benchmark. Model disagreements can still leave legitimate criteria for verification. Before production use, evaluate missed requirements, invented constraints, changed logical groups, priority mistakes, and unnecessary verification against independently labeled JDs.

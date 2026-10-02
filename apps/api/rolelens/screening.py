@@ -1,15 +1,19 @@
-from io import BytesIO
+import csv
+import re
+from io import BytesIO, StringIO
 from typing import Annotated, Literal
 from urllib.parse import quote
 from uuid import UUID
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import Response
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from fastapi.responses import Response, StreamingResponse
+from pydantic import Field
 
+from rolelens.decisions import selection
 from rolelens.dependencies import get_store
 from rolelens.job_descriptions import workspace_auth
+from rolelens.schemas import ScreeningPolicy
 from rolelens.storage import DocumentBundleTooLarge, Store
 
 router = APIRouter(
@@ -18,23 +22,15 @@ router = APIRouter(
 Database = Annotated[Store, Depends(get_store)]
 
 
-class Selection(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    id: UUID
-    version: int = Field(ge=1)
+class PolicyUpdate(ScreeningPolicy):
+    version: int = Field(ge=1, strict=True)
 
 
-class Approval(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    selections: list[Selection] = Field(min_length=1, max_length=100)
-    evidence_reviewed: Literal[True]
-
-    @field_validator("selections")
-    @classmethod
-    def unique(cls, items):
-        if len({item.id for item in items}) != len(items):
-            raise ValueError("Choose each application only once.")
-        return items
+@router.patch("/jobs/{job_id}/screening-policy")
+def update_policy(job_id: UUID, request: PolicyUpdate, store: Database):
+    return store.update_policy(
+        str(job_id), ScreeningPolicy(**request.model_dump(exclude={"version"})), request.version
+    )
 
 
 @router.get("/jobs/{job_id}/comparison")
@@ -57,13 +53,6 @@ def comparison(
     )
 
 
-@router.post("/jobs/{job_id}/shortlist")
-def approve(job_id: UUID, request: Approval, store: Database):
-    return store.approve_shortlist(
-        str(job_id), [{"id": str(item.id), "version": item.version} for item in request.selections]
-    )
-
-
 @router.post("/jobs/{job_id}/reassess")
 def reassess(job_id: UUID, store: Database):
     return store.reassess(str(job_id))
@@ -83,6 +72,70 @@ def document(application_id: UUID, store: Database):
     )
 
 
+@router.get("/jobs/{job_id}/shortlist/csv")
+def shortlist_csv(job_id: UUID, store: Database):
+    job = store.job(str(job_id))
+    policy = job["screening_policy"]
+
+    def generate():
+        buffer = StringIO()
+        writer = csv.writer(buffer)
+
+        def line(values):
+            buffer.seek(0)
+            buffer.truncate()
+            writer.writerow(
+                [
+                    "'" + str(value) if re.match(r"^[=+@\-\t\r]", str(value)) else value
+                    for value in values
+                ]
+            )
+            return buffer.getvalue()
+
+        yield line(
+            [
+                "Applicant",
+                "File",
+                "Matched criteria",
+                "Screening criteria",
+                "Match %",
+                "Threshold %",
+                "Policy version",
+                "Decision",
+                "Required supported",
+                "Preferred supported",
+                "Unresolved",
+            ]
+        )
+        for row in store.shortlist_rows(str(job_id), policy):
+            result = selection(row["screening"], "READY", policy)
+            yield line(
+                [
+                    row["name"],
+                    row["filename"],
+                    result["matched"],
+                    result["total"],
+                    result["percentage"],
+                    policy["threshold"],
+                    job["policy_version"],
+                    result["status"],
+                    row["screening"]["REQUIRED"]["supported"],
+                    row["screening"]["PREFERRED"]["supported"],
+                    row["screening"]["unresolved"],
+                ]
+            )
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="rolelens-{job_id}-shortlist.csv"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 @router.get("/jobs/{job_id}/shortlist/documents")
 def documents(job_id: UUID, store: Database):
     try:
@@ -90,9 +143,9 @@ def documents(job_id: UUID, store: Database):
     except DocumentBundleTooLarge as error:
         raise HTTPException(413, str(error)) from error
     if not rows:
-        raise HTTPException(422, "Approve a shortlist before downloading its resumes.")
+        raise HTTPException(422, "No applications currently meet the screening rules.")
     if len(rows) > 100:
-        raise HTTPException(422, "This download supports up to 100 approved resumes.")
+        raise HTTPException(422, "This download supports up to 100 shortlisted resumes.")
     if any(row.original_document is None for row in rows):
         raise HTTPException(
             409, "Some original files are unavailable. Restore or reimport them first."
