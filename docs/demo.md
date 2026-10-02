@@ -4,6 +4,8 @@ The demo follows the actual product: a job receives a 200-PDF bulk import, the w
 
 The local PDF sample contains mixed job categories. It demonstrates document handling and the processing workflow, not applicant suitability, model accuracy, fairness, or a production capacity guarantee. The public video shows applicant aliases and counts; its only close-up resume is the [fictional fixture](../examples/demo/fictional-resume.txt). The processing wait is omitted between clips and explicitly labeled.
 
+The recorded run selected 200 unique PDFs with seed `20261002`: 199 completed local OCR and live assessment; one yielded too little readable text and failed visibly. The fictional review used `jev-1.13.0`, with three supported requirements, a partial pytest mention, and Kafka not mentioned. The reviewer changed the testing finding to “Needs clarification” and saved a follow-up note. These observations are examples, not a quality evaluation.
+
 ## Prepare
 
 Install dependencies using the README. Configure `TYPESAFE_API_KEY` in `apps/api/.env` and install Tesseract with English language data for scanned PDFs. Live assessment sends extracted resume passages and role requirements to TypeSafe and can incur charges. The randomly sampled dataset documents are not anonymized internally: aliases only change the displayed names and filenames. Use a source you are permitted to process; do not commit or publicly display its original files or personal details.
@@ -47,6 +49,8 @@ The recorder operates the real browser UI, uploads all 200 documents once, and w
 
 If interrupted after the first clip, use `node scripts/record_demo.mjs --resume` to reuse the existing job without uploading the 200 documents again. Starting without `--resume` creates another job and can repeat hosted assessment calls. An interrupted recording may leave additional raw clips in the private recording folder; the export script uses only its four named completed clips.
 
+Use `--review-only` to rerecord the careers-form and review clips without repeating the bulk import. It submits another fictional application; existing fixture records remain unless you explicitly clean them up in the isolated demo database.
+
 Export the video:
 
 ```sh
@@ -61,7 +65,7 @@ Outputs in ignored `data/demo/share/`:
 - `cover.png`: opening frame suitable as a cover.
 - `video-details.json`: actual processing counts, video lengths, model, and editing notes.
 
-The videos have on-screen captions and no audio. The selected files, database, source mapping, recordings, and exports stay local. Review the final footage before sharing. Draft copy is in [social posts](social-posts.md).
+The videos have on-screen captions and no audio. The selected files, database, source mapping, and raw recordings stay local. The reviewed short export is also available as a [public documentation asset](demo-assets/rolelens-demo-short.mp4); the full export remains local. Draft copy is in [social posts](social-posts.md).
 
 ## Record manually or add your voice
 
@@ -81,6 +85,6 @@ Use this speaking outline, adjusting the counts to the actual result:
 
 For LinkedIn, attach the full MP4 and use the LinkedIn draft. For X, use the short MP4 and the short draft. Open each video once before uploading to check the pacing and readability. The source dataset link has not been recorded in this repository; add accurate attribution when you know its original Kaggle page. Do not describe this batch as a model accuracy evaluation or a production benchmark.
 
-For GitHub, the README links to this guide and its public fictional fixture. To embed a video that plays directly on GitHub, upload the reviewed MP4 through GitHub's attachment UI, then paste the returned attachment URL into the README in a new PR. Raw videos and the dataset are intentionally excluded from repository history. No release or social post is published by the recording scripts.
+For GitHub, the README links to this guide and its public fictional fixture. A reviewed short MP4 can be included as a small documentation asset. To embed a video that plays directly in the README, upload the reviewed MP4 through GitHub's attachment UI, then paste the returned attachment URL into the README in a new PR. Raw recording clips, the full local export, and the dataset are excluded from repository history. No release or social post is published by the recording scripts.
 
 The recording implementation follows [Playwright's video documentation](https://playwright.dev/docs/videos). Local OCR uses [Tesseract](https://tesseract-ocr.github.io/tessdoc/Command-Line-Usage.html) and [PDFium through pypdfium2](https://pypdfium2-team.github.io/pypdfium2/python_api.html).

@@ -8,6 +8,10 @@
 
 Self-hostable resume evidence review with automated application intake.
 
+[![Watch the short RoleLens demo](docs/demo-assets/cover.png)](docs/demo-assets/rolelens-demo-short.mp4)
+
+[Download the short demo](docs/demo-assets/rolelens-demo-short.mp4) · [Recording guide](docs/demo.md)
+
 Create a job once, receive applications from an external source or import many resumes together, and let a separate worker extract text and assess explicit role requirements. Reviewers inspect source evidence, correct findings, save notes, and export a review. RoleLens does not rank applicants or make hiring decisions.
 
 ## Current capabilities

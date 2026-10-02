@@ -16,7 +16,8 @@ if (files.length !== 200) throw new Error("Prepare exactly 200 PDFs before recor
 
 const browser = await chromium.launch({ headless: true, slowMo: 100 });
 const size = { width: 1440, height: 900 };
-const resumeRun = process.argv.includes("--resume");
+const reviewOnly = process.argv.includes("--review-only");
+const resumeRun = process.argv.includes("--resume") || reviewOnly;
 const report = resumeRun
   ? JSON.parse(await fs.readFile(path.join(directory, "recording-report.json"), "utf8"))
   : { source: "local PDF sample", selected: files.length, clips: [] };
@@ -31,16 +32,21 @@ async function api(endpoint) {
 
 async function caption(page, text) {
   await page.evaluate((label) => {
+    const container = document.querySelector("dialog[open]") ?? document.body;
     let element = document.querySelector("#recording-caption");
     if (!element) {
       element = document.createElement("div");
       element.id = "recording-caption";
-      element.style.cssText =
-        "position:fixed;z-index:2147483647;top:8px;left:50%;transform:translateX(-50%);" +
-        "background:#24292e;color:white;padding:9px 18px;border-radius:6px;" +
-        "font:500 14px/1.4 system-ui;pointer-events:none;box-shadow:0 2px 8px #0001;";
-      document.body.append(element);
     }
+    const box = container.getBoundingClientRect();
+    element.style.cssText =
+      "position:fixed;z-index:2147483647;background:#24292e;color:white;padding:9px 18px;" +
+      "border-radius:6px;font:500 14px/1.4 system-ui;pointer-events:none;" +
+      "box-shadow:0 2px 8px #0001;" +
+      (container.tagName === "DIALOG"
+        ? `bottom:12px;left:${box.left + 20}px;width:${box.width - 40}px;`
+        : "top:8px;left:50%;transform:translateX(-50%);");
+    container.append(element);
     element.textContent = label;
   }, text);
 }
@@ -124,56 +130,60 @@ try {
     await finish(first.context, first.page, "01-bulk-intake");
   }
 
-  const started = Date.now();
-  const deadline = started + 30 * 60 * 1000;
-  let summary;
-  while (Date.now() < deadline) {
-    summary = await api(`jobs/${report.bulk_job_id}/summary`);
-    const active = ["QUEUED", "PROCESSING", "RETRY_WAIT"].reduce(
-      (total, key) => total + (summary.statuses[key] ?? 0),
-      0,
-    );
-    console.log(`Bulk processing: ${JSON.stringify(summary.statuses)}`);
-    if (active === 0 && summary.total === 200) break;
-    await pause(20000);
-  }
-  if (
-    !summary ||
-    Object.keys(summary.statuses).some((key) =>
-      ["QUEUED", "PROCESSING", "RETRY_WAIT", "AWAITING_PROVIDER"].includes(key),
+  if (!reviewOnly) {
+    const started = Date.now();
+    const deadline = started + 30 * 60 * 1000;
+    let summary;
+    while (Date.now() < deadline) {
+      summary = await api(`jobs/${report.bulk_job_id}/summary`);
+      const active = ["QUEUED", "PROCESSING", "RETRY_WAIT"].reduce(
+        (total, key) => total + (summary.statuses[key] ?? 0),
+        0,
+      );
+      console.log(`Bulk processing: ${JSON.stringify(summary.statuses)}`);
+      if (active === 0 && summary.total === 200) break;
+      await pause(20000);
+    }
+    if (
+      !summary ||
+      Object.keys(summary.statuses).some((key) =>
+        ["QUEUED", "PROCESSING", "RETRY_WAIT", "AWAITING_PROVIDER"].includes(key),
+      )
     )
-  )
-    throw new Error("The sample did not finish processing. Check worker status before recording.");
-  report.bulk_summary = summary;
-  report.processing_wait_seconds = Math.round((Date.now() - started) / 1000);
-  const second = await openRecording();
-  await showInbox(second.page, report.bulk_job_title);
-  await caption(second.page, "03 / Processing complete. This cut skips the waiting time.");
-  await expect(
-    second.page.getByText("200 applications · page 1 of 4", { exact: true }),
-  ).toBeVisible();
-  await pause(5000);
-  await second.page.getByRole("button", { name: "Next page", exact: true }).click();
-  await expect(
-    second.page.getByText("200 applications · page 2 of 4", { exact: true }),
-  ).toBeVisible();
-  await pause(2500);
-  await second.page.getByRole("button", { name: "Next page", exact: true }).click();
-  await second.page.getByRole("button", { name: "Next page", exact: true }).click();
-  await expect(
-    second.page.getByText("200 applications · page 4 of 4", { exact: true }),
-  ).toBeVisible();
-  await pause(2500);
-  if (summary.statuses.FAILED) {
-    await caption(
-      second.page,
-      "Unsupported documents are isolated. Other applications keep processing.",
-    );
-    await second.page.getByLabel("Filter processing status").selectOption("FAILED");
-    await pause(3500);
-    await second.page.getByLabel("Filter processing status").selectOption("");
+      throw new Error(
+        "The sample did not finish processing. Check worker status before recording.",
+      );
+    report.bulk_summary = summary;
+    report.processing_wait_seconds = Math.round((Date.now() - started) / 1000);
+    const second = await openRecording();
+    await showInbox(second.page, report.bulk_job_title);
+    await caption(second.page, "03 / Processing complete. This cut skips the waiting time.");
+    await expect(
+      second.page.getByText("200 applications · page 1 of 4", { exact: true }),
+    ).toBeVisible();
+    await pause(5000);
+    await second.page.getByRole("button", { name: "Next page", exact: true }).click();
+    await expect(
+      second.page.getByText("200 applications · page 2 of 4", { exact: true }),
+    ).toBeVisible();
+    await pause(2500);
+    await second.page.getByRole("button", { name: "Next page", exact: true }).click();
+    await second.page.getByRole("button", { name: "Next page", exact: true }).click();
+    await expect(
+      second.page.getByText("200 applications · page 4 of 4", { exact: true }),
+    ).toBeVisible();
+    await pause(2500);
+    if (summary.statuses.FAILED) {
+      await caption(
+        second.page,
+        "Unsupported documents are isolated. Other applications keep processing.",
+      );
+      await second.page.getByLabel("Filter processing status").selectOption("FAILED");
+      await pause(3500);
+      await second.page.getByLabel("Filter processing status").selectOption("");
+    }
+    await finish(second.context, second.page, "02-processed-inbox");
   }
-  await finish(second.context, second.page, "02-processed-inbox");
 
   const third = await openRecording();
   const page = third.page;
