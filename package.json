@@ -1,0 +1,25 @@
+{
+  "name": "rolelens",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @rolelens/web",
+    "build": "npm run build --workspace @rolelens/web",
+    "start": "npm run start --workspace @rolelens/web",
+    "lint": "npm run lint --workspace @rolelens/web",
+    "typecheck": "npm run typecheck --workspace @rolelens/web",
+    "test": "npm run test --workspace @rolelens/web",
+    "test:e2e": "npm run test:e2e --workspace @rolelens/web",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.9"
+  }
+}

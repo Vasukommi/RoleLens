@@ -1,0 +1,147 @@
+@import url("./workspace.css");
+
+:root {
+  --bg: #f7f8fa;
+  --surface: #fff;
+  --ink: #202c3c;
+  --muted: #7b8798;
+  --line: #e7ebf0;
+  --accent: #078477;
+  --sidebar: #14252c;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+button {
+  color: inherit;
+}
+a {
+  color: inherit;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #69c8bb;
+  outline-offset: 3px;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 2px solid #a5d8ce;
+  outline-offset: 1px;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+svg {
+  flex-shrink: 0;
+}
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.button-primary {
+  color: #fff;
+  background: var(--accent);
+  box-shadow: 0 2px 3px #07847712;
+}
+.button-primary:hover:not(:disabled) {
+  background: #066f64;
+}
+.button-secondary {
+  background: #fff;
+  border-color: #dde3e9;
+}
+.button-secondary:hover:not(:disabled) {
+  background: #f4f7f9;
+}
+.button-reviewed {
+  background: #e6f5ee;
+  color: #21745b;
+  border-color: #cbe6d8;
+}
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  padding: 7px;
+  border-radius: 5px;
+  color: #7c8795;
+}
+.icon-button:hover:not(:disabled) {
+  background: #edf1f4;
+}
+.text-button {
+  color: #65768a;
+  border: 0;
+  background: transparent;
+  padding: 5px;
+  font-size: 11px;
+}
+.text-button:hover {
+  color: var(--accent);
+}
+.eyebrow {
+  color: #8491a0;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 1.5px;
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
