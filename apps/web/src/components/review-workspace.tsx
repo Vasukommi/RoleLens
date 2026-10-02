@@ -1,5 +1,7 @@
 "use client";
 
+import { Select } from "@/components/select";
+
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -674,20 +676,16 @@ export function ReviewWorkspace() {
                       {finding && (
                         <div className="correction">
                           <label htmlFor="finding-status">Reviewer correction</label>
-                          <select
+                          <Select
                             id="finding-status"
                             disabled={busy}
                             value={finding.status}
-                            onChange={(event) =>
-                              correctFinding(event.target.value as EvidenceStatus)
-                            }
-                          >
-                            {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                              <option key={value} value={value}>
-                                {label}
-                              </option>
-                            ))}
-                          </select>
+                            onValueChange={(value) => correctFinding(value as EvidenceStatus)}
+                            options={Object.entries(STATUS_LABELS).map(([value, label]) => ({
+                              value,
+                              label,
+                            }))}
+                          />
                           {finding.confidence !== null && (
                             <small>
                               Model certainty: {Math.round(finding.confidence * 100)}%. This
