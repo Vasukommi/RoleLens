@@ -16,5 +16,6 @@ test-results/
 !.env.*.example
 *.log
 *.tsbuildinfo
+next-env.d.ts
 .DS_Store
 data/
