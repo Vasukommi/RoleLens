@@ -1,3 +1,9 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="apps/web/assets/logo%20-%202.png">
+  <source media="(prefers-color-scheme: light)" srcset="apps/web/assets/logo%20-%201.png">
+  <img alt="RoleLens — Evidence-backed hiring review" src="apps/web/assets/logo%20-%201.png" width="420">
+</picture>
+
 # RoleLens
 
 Evidence-based resume review, built to self-host.

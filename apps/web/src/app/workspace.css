@@ -13,26 +13,16 @@
   z-index: 20;
 }
 .brand {
-  font-size: 19px;
-  font-weight: 650;
-  letter-spacing: -0.6px;
+  display: block;
   text-decoration: none;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin: 0 8px 32px;
+  width: 176px;
+  max-width: 100%;
+  margin: -8px auto 22px;
 }
-.brand-symbol {
-  width: 27px;
-  height: 27px;
-  border-radius: 6px;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  background: #25292f;
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: -0.8px;
+.brand img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 .workspace-context {
   display: flex;

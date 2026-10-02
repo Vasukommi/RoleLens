@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import wordmark from "../../assets/logo - 1.png";
 import { api } from "@/lib/api";
 import { reviewCsv } from "@/lib/export";
 import {
@@ -295,10 +297,7 @@ export function ReviewWorkspace() {
     <div className="app-shell">
       <aside id="workspace-navigation" className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <Link className="brand" href="/" aria-label="RoleLens home">
-          <span className="brand-symbol" aria-hidden="true">
-            R
-          </span>
-          <span>RoleLens</span>
+          <Image src={wordmark} alt="RoleLens" width={176} height={59} loading="eager" />
         </Link>
         <div className="workspace-context">
           <span className="workspace-icon">
