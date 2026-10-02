@@ -15,7 +15,10 @@ export default defineConfig({
     {
       command: "npm run dev -- --port 3010",
       url: "http://127.0.0.1:3010",
-      env: { API_BASE_URL: "http://127.0.0.1:8010" },
+      env: {
+        API_BASE_URL: "http://127.0.0.1:8010",
+        WORKSPACE_API_KEY: "synthetic-browser-workspace-token",
+      },
       reuseExistingServer: false,
     },
   ],

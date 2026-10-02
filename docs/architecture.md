@@ -44,6 +44,8 @@ The implementation uses SQLAlchemy's [DML/RETURNING support](https://docs.sqlalc
 
 ## Evidence and saved reviews
 
+Job creation can first interpret an ordinary JD through OpenAI Structured Outputs, source checks, optional Jev verification, and a review/confirmation step. A separate server token and per-process request bounds protect this paid endpoint within the local deployment boundary. Successful interpretations are cached in `job_interpretations`; jobs store the description and an immutable proposed/approved snapshot. See [job-description interpretation](job-descriptions.md) for model choice, prompt rules, exclusions, and limitations. Candidate resumes are not sent to OpenAI by this flow.
+
 Jobs contain fixed criteria for this version. Jev first selects a source passage for each criterion, then classifies that selected passage using closed-set questions. Response choices/distributions are checked, IDs resolve to verbatim text, and low confidence or irrelevant evidence retains uncertainty. The model does not rank candidates or decide hiring outcomes.
 
 Original findings stay separate from reviewer overrides and notes. A version check rejects stale review writes rather than losing a concurrent update. This retains original model output and the latest review, **not** a complete authenticated audit trail of every editor and edit. Full audit history and role revisions remain future work.

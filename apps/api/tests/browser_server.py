@@ -21,6 +21,8 @@ with tempfile.TemporaryDirectory(prefix="rolelens-browser-") as directory:
         **os.environ,
         "DATABASE_URL": f"sqlite:///{directory}/browser.db",
         "TYPESAFE_API_KEY": "",
+        "OPENAI_API_KEY": "",
+        "WORKSPACE_API_KEY": "synthetic-browser-workspace-token",
         "INTAKE_API_KEY": "synthetic-browser-token",
     }
     subprocess.run(
@@ -35,7 +37,28 @@ with tempfile.TemporaryDirectory(prefix="rolelens-browser-") as directory:
 from rolelens.storage import Store
 from rolelens.schemas import Assessment, Finding, Passage
 from rolelens.config import Settings
+from rolelens.job_descriptions import cache_key, InterpretationRequest, PROMPT_VERSION
 store = Store(Settings().database_url)
+description = ('Must have Node.js experience. React or Angular preferred. '
+               'Minimum 3 years in Node.js.')
+request = InterpretationRequest(title='JD browser fixture', description=description)
+store.save_interpretation(cache_key(request, Settings()), request.title, description, {
+    'requirements': [
+        {'id': 'node', 'text': 'Node.js experience', 'priority': 'REQUIRED',
+         'assessment_mode': 'RESUME_EVIDENCE', 'source_quote': 'Must have Node.js experience.',
+         'review_note': None},
+        {'id': 'frontend', 'text': 'React or Angular', 'priority': 'PREFERRED',
+         'assessment_mode': 'RESUME_EVIDENCE', 'source_quote': 'React or Angular preferred.',
+         'review_note': None},
+        {'id': 'duration', 'text': 'Minimum 3 years in Node.js', 'priority': 'REQUIRED',
+         'assessment_mode': 'VERIFY_SEPARATELY', 'source_quote': 'Minimum 3 years in Node.js.',
+         'review_note': 'Duration needs separate verification.'},
+    ],
+    'validation': {'node': 'GROUNDED', 'frontend': 'GROUNDED', 'duration': 'GROUNDED'},
+    'review_notes': ['This is a synthetic browser-test interpretation; no model calls.'],
+    'model': 'synthetic-browser-fixture', 'verifier_model': 'synthetic-browser-fixture',
+    'prompt_version': PROMPT_VERSION, 'usage': {},
+})
 text = 'Fictional browser fixture. Built Python APIs with FastAPI and background jobs.'
 job = store.create_job('Dropdown review fixture', [{'id': 'python', 'text': 'Built Python APIs'}])
 receipt = store.accept(job['id'], 'Dropdown Test Applicant', 'fictional.txt', text=text,

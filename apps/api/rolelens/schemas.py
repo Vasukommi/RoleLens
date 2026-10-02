@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 MAX_RESUME_CHARS = 24_000
-MAX_REQUIREMENTS = 12
+MAX_REQUIREMENTS = 32
 
 
 class EvidenceStatus(StrEnum):
@@ -20,6 +20,12 @@ class Requirement(BaseModel):
 
     id: str = Field(min_length=1, max_length=80, pattern=r"^[a-zA-Z0-9_-]+$")
     text: str = Field(min_length=3, max_length=300)
+    priority: Literal["REQUIRED", "PREFERRED", "UNSPECIFIED"] = "UNSPECIFIED"
+    assessment_mode: Literal["RESUME_EVIDENCE", "VERIFY_SEPARATELY", "INTERVIEW"] = (
+        "RESUME_EVIDENCE"
+    )
+    source_quote: str | None = Field(default=None, min_length=1, max_length=2000)
+    review_note: str | None = Field(default=None, max_length=600)
 
 
 class Passage(BaseModel):
