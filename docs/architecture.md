@@ -1,45 +1,59 @@
-# Architecture and current boundaries
-
-## Request path
+# Intake, processing, and review architecture
 
 ```text
-Browser → Next.js same-origin proxy → FastAPI
-                                      ├─ document parser
-                                      └─ assessment provider → TypeSafe's hosted Jev API
+Careers site / future source adapter ── authenticated intake API ──┐
+                                                                 │
+Reviewer → Next.js → bulk upload / jobs API ───────────────────────┤
+                                                                 ▼
+                                    PostgreSQL (SQLite locally)
+                                    jobs + applications + receipts
+                                              │
+                                              ▼
+                                   Separate leased queue worker
+                                    ├─ bounded document parsing
+                                    └─ evidence provider → hosted Jev
+                                              │
+                                              ▼
+                              persisted original findings + review edits
+                                              │
+                                              ▼
+                                    paginated reviewer inbox
 ```
 
-Next.js renders the reviewer workspace. Its server-side proxy permits only the four documented API operations. Backend URLs and Jev credentials are not exposed to the browser. FastAPI owns parsing, request validation, provider calls, source selection, and response validation. No database exists in this first change.
+## Acceptance and duplicate delivery
 
-## Assessment
+An intake transaction stores the application and queue state together. There is no second broker publication that can be lost between database commit and scheduling. A unique job/delivery key resolves concurrent duplicate submissions. Integrated sources key by source and stable external application ID; manual bulk import keys by document hash within the job. Changed content under an existing source ID is a conflict, not a silent overwrite.
 
-1. A reviewer enters up to twelve explicit requirements.
-2. The parser produces resume text and verbatim source passages. It does not rewrite claims.
-3. One Jev request selects a relevant passage or `NONE` for each requirement against the whole resume.
-4. A second request classifies each selected passage against its corresponding requirement.
-5. Code checks the returned choices and distributions, resolves passage IDs to original text, and applies an uncertainty threshold. An irrelevant selected passage produces `UNCLEAR`, not an absence claim about the entire resume.
-6. The reviewer inspects, corrects, annotates, and exports the findings.
+Bulk selection uploads three files concurrently, each bounded to 5 MB. Per-file receipt UUIDs survive retries within that browser session, so an uncertain upload response does not create another application or count another receipt. Batch records show expected versus received deliveries. Closing the tab stops files not yet uploaded; already accepted applications remain durable and process independently. Reimporting unsubmitted files is safe, with duplicate detection for already received documents.
 
-A supporting resume statement is not verified competence. The application provides no suitability score, candidate ranking, or automated hiring decision. Confidence is a model signal, not a probability of job performance. Numerical tenure checks deliberately require clarification.
+API and Next.js cap request bodies at 6 MB. Job lists contain only metadata, with server-side search/status filtering and fifty rows per page. Full text and findings load for the selected application.
 
-Two stages improve source consistency but do not guarantee accurate judgments. The provider's selection can miss relevant text, and one cited passage can omit context. The confidence floor is a configurable development default; it has not been calibrated on a hiring dataset. Evaluation of model accuracy is separate from mocked integration tests.
+## Queue guarantees
 
-## Data handling
+The separate worker claims work with an atomic database update and a unique expiring lease. PostgreSQL skips rows locked by another claim; a second conditional check prevents duplicate ownership. SQLite is supported for single-host development. Lease renewal runs during parsing and hosted calls; expired work is reclaimable after worker termination. Writes carry the lease token so a replaced worker cannot publish its old result.
 
-Uploaded PDF, DOCX, and UTF-8 TXT files have a 5 MB limit. PDF uploads are limited to twenty pages; extracted text is limited to 24,000 characters. DOCX archives are inspected for excessive entry count and unpacked size before parsing. Scanned documents and encrypted PDFs are rejected with an actionable error.
+Provider failures back off exponentially, capped at five minutes, for a bounded number of attempts. Invalid documents fail individually. Repeated hard interruptions also stop automatic processing. With no Jev key, documents parse and become `AWAITING_PROVIDER`; a worker restarted with a key automatically resumes them. Worker heartbeat freshness is visible in the UI.
 
-FastAPI reads uploaded files and closes them after parsing. The multipart framework may spool larger files to temporary storage, which is closed after the request. RoleLens does not retain source files or assessment records. The browser holds extracted text, findings, reviewer corrections, and notes in React memory. Refreshing loses the session; CSV export preserves a local copy. Application code does not log resume content or provider credentials.
+This is **at-least-once processing**, not exactly-once external inference. A worker can die after a paid provider response but before committing it, causing a repeated call on recovery. Inbound delivery deduplication prevents repeated submissions from scheduling duplicate applications; it does not eliminate this external side-effect window. Live quotas, cost ceilings, parser isolation, retention, and capacity monitoring require further work.
 
-Live assessment sends resume passages and requirements to `https://api.typesafe.ai/v1/systemone`. This includes any personal details still present in the supplied passages. Provider retention, residency, and contractual settings must be checked with TypeSafe separately; RoleLens does not control them. Sample findings are fixed synthetic fixtures with no generated confidence values and no model calls.
+The implementation uses SQLAlchemy's [DML/RETURNING support](https://docs.sqlalchemy.org/en/20/core/dml.html). Processing is independent of HTTP request lifetimes, consistent with FastAPI's [guidance on heavier background work](https://fastapi.tiangolo.com/tutorial/background-tasks/#caveat).
 
-## Deployment boundary
+## Evidence and saved reviews
 
-This is a local development preview. There is no authentication, authorization, tenant isolation, persistent audit history, rate limiting, or parser process sandbox. Do not expose this version to a shared or public network. Docker Compose binds the web server to localhost and keeps FastAPI on the internal container network. A configured backend key enables paid hosted model calls for anyone with access to the local app.
+Jobs contain fixed criteria for this version. Jev first selects a source passage for each criterion, then classifies that selected passage using closed-set questions. Response choices/distributions are checked, IDs resolve to verbatim text, and low confidence or irrelevant evidence retains uncertainty. The model does not rank candidates or decide hiring outcomes.
 
-## Next changes
+Original findings stay separate from reviewer overrides and notes. A version check rejects stale review writes rather than losing a concurrent update. This retains original model output and the latest review, **not** a complete authenticated audit trail of every editor and edit. Full audit history and role revisions remain future work.
 
-- Add persistent roles, document records, and assessment versions with database migrations.
-- Add authentication and workspace permissions before supporting shared deployments.
-- Preserve original findings and reviewer edits in an audit history.
-- Add a background processing queue, resource isolation, and request limits for batches.
-- Establish a synthetic evaluation set for evidence selection, missing mentions, ambiguity, and adversarial resume content.
-- Add an assessment provider selected through explicit configuration, with parity tests for alternatives.
+A resume claim is not verified competence, and missing mentions are not proof of absent skills. The confidence floor is an uncalibrated development default. Model evaluation and production throughput testing are separate from integration tests with synthetic responses.
+
+## Stored candidate data
+
+Pending/failed source bytes, extracted text, source IDs, original assessments, and reviewer data are stored in the database. Source bytes are cleared after successful extraction; failures retain bytes so parsing can be retried. Extracted text and review records persist. The Compose `database` volume therefore contains candidate information and must be protected, backed up, and governed by a retention policy. Deletion/retention administration is not implemented yet.
+
+PDFs are limited to twenty pages, DOCX unpacked content to 15 MB, and extracted text to 24,000 characters. Scanned/encrypted documents fail clearly; there is no OCR. Multipart uploads may spool to temporary disk before acceptance. Application logs exclude source text, credentials, and provider response bodies.
+
+Live inference sends passages and requirements to TypeSafe. Self-hosting the app does not imply local inference, residency guarantees, or control over the hosted provider's retention. Verify provider arrangements separately. Synthetic fixtures remain at `/demo` and are never automatically ingested into real jobs.
+
+## Current deployment boundary
+
+Compose starts PostgreSQL, migrations, FastAPI, a worker, and Next.js. Only the web port is published, bound to localhost. Programmatic intake requires a separate bearer token and is not forwarded by the browser proxy. Human reviewer endpoints currently rely on the isolated local deployment; they have no user authentication, permissions, tenant isolation, or public service protections. Do not expose this preview to shared/public networks.
