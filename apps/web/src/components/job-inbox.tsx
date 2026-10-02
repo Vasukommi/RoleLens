@@ -1,61 +1,34 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Image from "next/image";
-import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowDownToLine,
-  ArrowRight,
   Check,
   ChevronLeft,
   ChevronRight,
   FileText,
-  Github,
   LoaderCircle,
   Plus,
   RefreshCw,
   Search,
   Upload,
-  Users,
+  BriefcaseBusiness,
   X,
 } from "lucide-react";
-import logo from "../../assets/logo - 1.png";
+import { WorkspaceShell, type WorkspaceSection } from "@/components/workspace-shell";
+import { WorkspaceExports } from "@/components/workspace-exports";
+import type {
+  Job,
+  Application,
+  ApplicationPage as Page,
+  JobSummary as Summary,
+} from "@/lib/inbox-types";
 import { Select } from "@/components/select";
 import { api } from "@/lib/api";
 import { reviewCsv } from "@/lib/export";
-import {
-  STATUS_LABELS,
-  type Assessment,
-  type Candidate,
-  type EvidenceStatus,
-  type Requirement,
-} from "@/lib/types";
+import { STATUS_LABELS, type Candidate, type EvidenceStatus } from "@/lib/types";
 
-type Job = { id: string; title: string; requirements: Requirement[] };
-type Application = {
-  id: string;
-  job_id: string;
-  name: string;
-  filename: string;
-  source: string;
-  external_id: string | null;
-  status: string;
-  error: string | null;
-  reviewed: boolean;
-  version: number;
-  text: string | null;
-  extraction_method: "native" | "ocr" | "mixed" | null;
-  assessment: Assessment | null;
-  overrides: Record<string, EvidenceStatus>;
-  notes: string;
-};
-type Page = { items: Application[]; total: number; page: number; limit: number };
-type Summary = {
-  total: number;
-  reviewed: number;
-  statuses: Record<string, number>;
-  batches: { id: string; received: number; expected: number; duplicates: number }[];
-};
 type UploadItem = {
   file: File;
   receipt: string;
@@ -71,7 +44,10 @@ const PIPELINE: Record<string, string> = {
   FAILED: "Failed",
 };
 
-export function JobInbox() {
+export function JobInbox({ section = "library" }: { section?: WorkspaceSection }) {
+  const router = useRouter();
+  const params = useSearchParams();
+  const requestedJob = params.get("job");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [jobId, setJobId] = useState("");
   const [health, setHealth] = useState<{
@@ -113,7 +89,13 @@ export function JobInbox() {
   }, [jobId, selectedId]);
 
   const refresh = useCallback(async () => {
-    if (!jobId) return;
+    if (!jobId) {
+      const nextHealth = await api<{ worker_active: boolean; assessment_available: boolean }>(
+        "health",
+      );
+      if (!jobRef.current) setHealth(nextHealth);
+      return;
+    }
     const sequence = ++refreshSequence.current;
     const query = new URLSearchParams({ page: String(page), search, status });
     const [nextSummary, nextPage, nextHealth] = await Promise.all([
@@ -133,7 +115,7 @@ export function JobInbox() {
       .then((data) => {
         if (!cancelled) {
           setJobs(data);
-          setJobId(data[0]?.id ?? "");
+          setJobId(data.find((job) => job.id === requestedJob)?.id ?? data[0]?.id ?? "");
         }
       })
       .catch((failure) => {
@@ -142,7 +124,7 @@ export function JobInbox() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [requestedJob]);
 
   useEffect(() => {
     let cancelled = false;
@@ -217,6 +199,7 @@ export function JobInbox() {
     setPage(1);
     setSearch("");
     setStatus("");
+    router.push(`/?job=${id}`);
   }
 
   async function createJob() {
@@ -406,539 +389,573 @@ export function JobInbox() {
   }
 
   return (
-    <div className="inbox-shell">
-      <aside className="inbox-sidebar">
-        <Link href="/" className="brand" aria-label="RoleLens home">
-          <Image src={logo} alt="RoleLens" sizes="176px" loading="eager" />
-        </Link>
-        <div className="nav-caption">Hiring workspace</div>
-        <div className="inbox-nav">
-          <Users size={16} />
-          Application inbox
-        </div>
-        <div className="nav-caption">Jobs</div>
-        <div className="job-navigation">
-          {jobs.map((job) => (
-            <button
-              key={job.id}
-              disabled={importing}
-              aria-pressed={job.id === jobId}
-              onClick={() => chooseJob(job.id)}
-            >
-              {job.title}
-            </button>
-          ))}
-        </div>
-        <button
-          className="nav-item"
-          disabled={importing}
-          onClick={() => {
-            setError("");
-            setCreating(true);
-          }}
-        >
-          <Plus size={16} />
-          New job
-        </button>
-        <div className="sidebar-spacer" />
-        <Link className="nav-item" href="/demo">
-          Synthetic demo
-          <ArrowRight size={14} />
-        </Link>
-        <a
-          className="nav-item"
-          href="https://github.com/Vasukommi/RoleLens/blob/feat/application-intake/docs/integrations.md"
-          target="_blank"
-          rel="noreferrer"
-        >
-          <Github size={16} />
-          Integration guide
-        </a>
-        <div className="sidebar-footer">
-          Development preview<span>v0.2</span>
-        </div>
-      </aside>
-      <div className="inbox-main">
-        <header className="topbar">
-          <div className="breadcrumb">
-            Hiring
-            <ChevronRight size={12} />
-            <span>Application inbox</span>
-          </div>
+    <>
+      <WorkspaceShell
+        section={section}
+        jobId={jobId}
+        beforeNavigate={() =>
+          !importing && (!dirty || window.confirm("Discard your unsaved review changes?"))
+        }
+        status={
           <span className={`connection ${health?.worker_active ? "connected" : ""}`}>
             <span />
             {health?.worker_active ? "Worker online" : "Worker offline"}
           </span>
-        </header>
-        <main>
-          <div className="page-heading">
-            <div>
-              <h1>{currentJob?.title ?? "Application inbox"}</h1>
-              <p>Applications arrive here. Processing runs in the background.</p>
-            </div>
-            <button
-              className="button button-primary"
-              disabled={!jobId || importing}
-              onClick={() => fileInput.current?.click()}
-            >
-              <Upload size={16} />
-              {importing ? "Uploading…" : "Import resumes"}
+        }
+      >
+        <div className="page-heading">
+          <div>
+            <h1>
+              {section === "jobs"
+                ? "Jobs"
+                : section === "exports"
+                  ? "Exports"
+                  : (currentJob?.title ?? "Resume library")}
+            </h1>
+            <p>
+              {section === "jobs"
+                ? "Create roles and define the criteria used to assess incoming resumes."
+                : section === "exports"
+                  ? "Download saved application reviews and their supporting evidence."
+                  : "Import and inspect resumes for this job. PDF, DOCX, and TXT are supported."}
+            </p>
+          </div>
+          <div className="heading-actions">
+            {section !== "exports" && (
+              <button
+                className={`button ${section === "jobs" ? "button-primary" : "button-secondary"}`}
+                disabled={importing}
+                onClick={() => {
+                  setError("");
+                  setCreating(true);
+                }}
+              >
+                <Plus size={16} />
+                New job
+              </button>
+            )}
+            {section === "library" && (
+              <button
+                className="button button-primary"
+                disabled={!jobId || importing}
+                onClick={() => fileInput.current?.click()}
+              >
+                <Upload size={16} />
+                {importing ? "Uploading…" : "Import resumes"}
+              </button>
+            )}
+          </div>
+        </div>
+        {section !== "jobs" && jobs.length > 0 && (
+          <div className="results-context">
+            <label htmlFor="workspace-job">Job</label>
+            <Select
+              id="workspace-job"
+              disabled={importing}
+              value={jobId}
+              onValueChange={(value) => {
+                if (section === "exports") router.push(`/exports?job=${value}`);
+                else chooseJob(value);
+              }}
+              options={jobs.map((job) => ({ value: job.id, label: job.title }))}
+            />
+            <span>
+              Resumes are currently stored per job. Reusable folders are shown in the demo.
+            </span>
+          </div>
+        )}
+        <input
+          ref={fileInput}
+          type="file"
+          multiple
+          accept=".pdf,.docx,.txt"
+          hidden
+          onChange={(event) => {
+            const files = Array.from(event.target.files ?? []);
+            event.target.value = "";
+            if (!files.length) return;
+            if (files.length > 10000) {
+              setError("Choose up to 10,000 files per import.");
+              return;
+            }
+            const next: UploadItem[] = files.map((file) => ({
+              file,
+              receipt: crypto.randomUUID(),
+              state: "pending",
+            }));
+            setItems(next);
+            setBatchId("");
+            void uploadPending(next);
+          }}
+        />
+        {error && !creating && (
+          <div className="alert alert-error" role="alert">
+            {error}
+            <button className="icon-button" aria-label="Dismiss error" onClick={() => setError("")}>
+              <X size={16} />
             </button>
           </div>
-          <input
-            ref={fileInput}
-            type="file"
-            multiple
-            accept=".pdf,.docx,.txt"
-            hidden
-            onChange={(event) => {
-              const files = Array.from(event.target.files ?? []);
-              event.target.value = "";
-              if (!files.length) return;
-              if (files.length > 10000) {
-                setError("Choose up to 10,000 files per import.");
-                return;
-              }
-              const next: UploadItem[] = files.map((file) => ({
-                file,
-                receipt: crypto.randomUUID(),
-                state: "pending",
-              }));
-              setItems(next);
-              setBatchId("");
-              void uploadPending(next);
-            }}
-          />
-          {error && !creating && (
-            <div className="alert alert-error" role="alert">
-              {error}
-              <button
-                className="icon-button"
-                aria-label="Dismiss error"
-                onClick={() => setError("")}
-              >
-                <X size={16} />
-              </button>
+        )}
+        {notice && (
+          <div className="alert alert-notice" role="status">
+            {notice}
+            <button
+              className="icon-button"
+              aria-label="Dismiss notice"
+              onClick={() => setNotice("")}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+        {section === "jobs" ? (
+          jobs.length ? (
+            <div className="job-card-grid">
+              {jobs.map((job) => (
+                <article className="job-card" key={job.id}>
+                  <div className="card-icon">
+                    <BriefcaseBusiness size={18} />
+                  </div>
+                  <h2>{job.title}</h2>
+                  <p>{job.requirements.length} explicit requirements</p>
+                  <ul className="job-criteria-preview">
+                    {job.requirements.slice(0, 3).map((requirement) => (
+                      <li key={requirement.id}>{requirement.text}</li>
+                    ))}
+                  </ul>
+                  <button
+                    className="button button-secondary"
+                    aria-label={`Open resumes for ${job.title}`}
+                    onClick={() => chooseJob(job.id)}
+                  >
+                    Open resumes
+                    <ChevronRight size={14} />
+                  </button>
+                </article>
+              ))}
             </div>
-          )}
-          {notice && (
-            <div className="alert alert-notice" role="status">
-              {notice}
-              <button
-                className="icon-button"
-                aria-label="Dismiss notice"
-                onClick={() => setNotice("")}
-              >
-                <X size={16} />
-              </button>
-            </div>
-          )}
-          {!currentJob ? (
+          ) : (
             <section className="empty-review">
-              <FileText size={30} />
-              <h2>Create a job to start receiving applications</h2>
-              <p>
-                Define the role once. Import many resumes together or connect your application
-                source to the intake API.
-              </p>
+              <BriefcaseBusiness size={30} />
+              <h2>Create your first job</h2>
+              <p>Define role requirements, then import resumes into its library.</p>
               <button className="button button-primary" onClick={() => setCreating(true)}>
-                <Plus size={16} />
                 Create job
               </button>
             </section>
+          )
+        ) : section === "exports" ? (
+          currentJob ? (
+            <WorkspaceExports key={currentJob.id} job={currentJob} />
           ) : (
-            <>
-              <div className="inbox-stats" aria-label="Job processing totals">
-                <div>
-                  <span>Applications</span>
-                  <strong>{summary?.total ?? 0}</strong>
-                </div>
-                <div>
-                  <span>In progress</span>
-                  <strong>{pendingCount}</strong>
-                </div>
-                <div>
-                  <span>Ready for review</span>
-                  <strong>{summary?.statuses.READY ?? 0}</strong>
-                </div>
-                <div>
-                  <span>Reviewed</span>
-                  <strong>{summary?.reviewed ?? 0}</strong>
-                </div>
-                <div>
-                  <span>Failed</span>
-                  <strong>{summary?.statuses.FAILED ?? 0}</strong>
-                </div>
+            <section className="empty-review">
+              <ArrowDownToLine size={30} />
+              <h2>No reviews to export yet</h2>
+              <p>Create a job and import resumes to start collecting application reviews.</p>
+              <button className="button button-primary" onClick={() => setCreating(true)}>
+                Create job
+              </button>
+            </section>
+          )
+        ) : !currentJob ? (
+          <section className="empty-review">
+            <FileText size={30} />
+            <h2>Create a job to start receiving applications</h2>
+            <p>
+              Define the role once. Import many resumes together or connect your application source
+              to the intake API.
+            </p>
+            <button className="button button-primary" onClick={() => setCreating(true)}>
+              <Plus size={16} />
+              Create job
+            </button>
+          </section>
+        ) : (
+          <>
+            <div className="inbox-stats" aria-label="Job processing totals">
+              <div>
+                <span>Applications</span>
+                <strong>{summary?.total ?? 0}</strong>
               </div>
-              {!health?.worker_active && health && (
-                <div className="pipeline-message">
-                  Worker is offline. Accepted applications are saved and will process when the
-                  worker starts.
+              <div>
+                <span>In progress</span>
+                <strong>{pendingCount}</strong>
+              </div>
+              <div>
+                <span>Ready for review</span>
+                <strong>{summary?.statuses.READY ?? 0}</strong>
+              </div>
+              <div>
+                <span>Reviewed</span>
+                <strong>{summary?.reviewed ?? 0}</strong>
+              </div>
+              <div>
+                <span>Failed</span>
+                <strong>{summary?.statuses.FAILED ?? 0}</strong>
+              </div>
+            </div>
+            {!health?.worker_active && health && (
+              <div className="pipeline-message">
+                Worker is offline. Accepted applications are saved and will process when the worker
+                starts.
+              </div>
+            )}
+            {!health?.assessment_available && health && (
+              <div className="pipeline-message">
+                Automatic assessment is awaiting Jev configuration. Documents still parse and can be
+                inspected.
+              </div>
+            )}
+            {items.length > 0 && (
+              <section className="import-progress" aria-label="Bulk import progress">
+                <div>
+                  <strong>
+                    {uploadedCount} / {items.length} files accepted
+                  </strong>
+                  <span>
+                    {items.filter((i) => i.state === "duplicate").length} duplicates ·{" "}
+                    {failedUploads.length} failed uploads
+                  </span>
                 </div>
-              )}
-              {!health?.assessment_available && health && (
-                <div className="pipeline-message">
-                  Automatic assessment is awaiting Jev configuration. Documents still parse and can
-                  be inspected.
-                </div>
-              )}
-              {items.length > 0 && (
-                <section className="import-progress" aria-label="Bulk import progress">
-                  <div>
-                    <strong>
-                      {uploadedCount} / {items.length} files accepted
-                    </strong>
-                    <span>
-                      {items.filter((i) => i.state === "duplicate").length} duplicates ·{" "}
-                      {failedUploads.length} failed uploads
-                    </span>
-                  </div>
-                  <progress value={uploadedCount + failedUploads.length} max={items.length} />
-                  {importing && (
-                    <p>
-                      Keep this tab open until uploads finish. Accepted work continues after you
-                      leave.
-                    </p>
-                  )}
-                  {failedUploads.length > 0 && (
-                    <>
-                      <button
-                        className="button button-secondary"
-                        disabled={importing}
-                        onClick={() => void uploadPending(items, batchId)}
-                      >
-                        Retry failed uploads
-                      </button>
-                      <details>
-                        <summary>Upload errors</summary>
-                        {failedUploads.slice(0, 50).map((item) => (
-                          <p key={item.receipt}>
-                            {item.file.name}: {item.error}
-                          </p>
-                        ))}
-                        {failedUploads.length > 50 && (
-                          <p>Showing the first 50 errors. Retry applies to all failed files.</p>
-                        )}
-                      </details>
-                    </>
-                  )}
-                </section>
-              )}
-              <div className="inbox-toolbar">
-                <label className="search-field">
-                  <Search size={16} />
-                  <input
-                    aria-label="Search applications"
-                    placeholder="Search applications"
-                    value={search}
-                    onChange={(event) => {
-                      setSearch(event.target.value);
-                      setPage(1);
-                    }}
-                  />
-                </label>
-                <Select
-                  aria-label="Filter processing status"
-                  value={status}
-                  onValueChange={(value) => {
-                    setStatus(value);
+                <progress value={uploadedCount + failedUploads.length} max={items.length} />
+                {importing && (
+                  <p>
+                    Keep this tab open until uploads finish. Accepted work continues after you
+                    leave.
+                  </p>
+                )}
+                {failedUploads.length > 0 && (
+                  <>
+                    <button
+                      className="button button-secondary"
+                      disabled={importing}
+                      onClick={() => void uploadPending(items, batchId)}
+                    >
+                      Retry failed uploads
+                    </button>
+                    <details>
+                      <summary>Upload errors</summary>
+                      {failedUploads.slice(0, 50).map((item) => (
+                        <p key={item.receipt}>
+                          {item.file.name}: {item.error}
+                        </p>
+                      ))}
+                      {failedUploads.length > 50 && (
+                        <p>Showing the first 50 errors. Retry applies to all failed files.</p>
+                      )}
+                    </details>
+                  </>
+                )}
+              </section>
+            )}
+            <div className="inbox-toolbar">
+              <label className="search-field">
+                <Search size={16} />
+                <input
+                  aria-label="Search applications"
+                  placeholder="Search applications"
+                  value={search}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
                     setPage(1);
                   }}
-                  options={[
-                    { value: "", label: "All applications" },
-                    ...Object.entries(PIPELINE).map(([value, label]) => ({ value, label })),
-                    { value: "REVIEWED", label: "Reviewed" },
-                  ]}
                 />
+              </label>
+              <Select
+                aria-label="Filter processing status"
+                value={status}
+                onValueChange={(value) => {
+                  setStatus(value);
+                  setPage(1);
+                }}
+                options={[
+                  { value: "", label: "All applications" },
+                  ...Object.entries(PIPELINE).map(([value, label]) => ({ value, label })),
+                  { value: "REVIEWED", label: "Reviewed" },
+                ]}
+              />
+              <button
+                className="button button-secondary"
+                onClick={() => void retry(`jobs/${jobId}/retry`)}
+              >
+                <RefreshCw size={14} />
+                Retry failed / waiting
+              </button>
+            </div>
+            <div className="inbox-table-wrap">
+              <table className="inbox-table">
+                <thead>
+                  <tr>
+                    <th>Applicant</th>
+                    <th>Source</th>
+                    <th>Processing</th>
+                    <th>Review</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {listing?.items.map((application) => (
+                    <tr
+                      key={application.id}
+                      className={application.id === selectedId ? "selected" : ""}
+                    >
+                      <td>
+                        <button
+                          onClick={() => chooseApplication(application.id)}
+                          aria-pressed={application.id === selectedId}
+                        >
+                          {application.name}
+                          <span>{application.filename}</span>
+                        </button>
+                      </td>
+                      <td>{application.source.replaceAll("_", " ")}</td>
+                      <td>
+                        <span
+                          className={`pipeline-status pipeline-${application.status.toLowerCase()}`}
+                        >
+                          {PIPELINE[application.status]}
+                        </span>
+                      </td>
+                      <td>
+                        {application.reviewed ? (
+                          <span className="review-done">
+                            <Check size={12} />
+                            Reviewed
+                          </span>
+                        ) : (
+                          "Pending"
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {listing?.items.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="inbox-empty">
+                        {search || status
+                          ? "No applications match these filters."
+                          : "No applications yet. Import resumes or connect a source."}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="inbox-pagination">
+              <span>
+                {listing?.total ?? 0} applications · page {page} of{" "}
+                {Math.max(1, Math.ceil((listing?.total ?? 0) / 50))}
+              </span>
+              <div>
                 <button
-                  className="button button-secondary"
-                  onClick={() => void retry(`jobs/${jobId}/retry`)}
+                  className="icon-button"
+                  aria-label="Previous page"
+                  disabled={page === 1}
+                  onClick={() => setPage((n) => n - 1)}
                 >
-                  <RefreshCw size={14} />
-                  Retry failed / waiting
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  className="icon-button"
+                  aria-label="Next page"
+                  disabled={page * 50 >= (listing?.total ?? 0)}
+                  onClick={() => setPage((n) => n + 1)}
+                >
+                  <ChevronRight size={16} />
                 </button>
               </div>
-              <div className="inbox-table-wrap">
-                <table className="inbox-table">
-                  <thead>
-                    <tr>
-                      <th>Applicant</th>
-                      <th>Source</th>
-                      <th>Processing</th>
-                      <th>Review</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {listing?.items.map((application) => (
-                      <tr
-                        key={application.id}
-                        className={application.id === selectedId ? "selected" : ""}
-                      >
-                        <td>
-                          <button
-                            onClick={() => chooseApplication(application.id)}
-                            aria-pressed={application.id === selectedId}
-                          >
-                            {application.name}
-                            <span>{application.filename}</span>
-                          </button>
-                        </td>
-                        <td>{application.source.replaceAll("_", " ")}</td>
-                        <td>
-                          <span
-                            className={`pipeline-status pipeline-${application.status.toLowerCase()}`}
-                          >
-                            {PIPELINE[application.status]}
-                          </span>
-                        </td>
-                        <td>
-                          {application.reviewed ? (
-                            <span className="review-done">
-                              <Check size={12} />
-                              Reviewed
-                            </span>
-                          ) : (
-                            "Pending"
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                    {listing?.items.length === 0 && (
-                      <tr>
-                        <td colSpan={4} className="inbox-empty">
-                          {search || status
-                            ? "No applications match these filters."
-                            : "No applications yet. Import resumes or connect a source."}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <div className="inbox-pagination">
-                <span>
-                  {listing?.total ?? 0} applications · page {page} of{" "}
-                  {Math.max(1, Math.ceil((listing?.total ?? 0) / 50))}
-                </span>
-                <div>
-                  <button
-                    className="icon-button"
-                    aria-label="Previous page"
-                    disabled={page === 1}
-                    onClick={() => setPage((n) => n - 1)}
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                  <button
-                    className="icon-button"
-                    aria-label="Next page"
-                    disabled={page * 50 >= (listing?.total ?? 0)}
-                    onClick={() => setPage((n) => n + 1)}
-                  >
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              </div>
-              {selected && (
-                <dialog
-                  className="application-drawer"
-                  ref={reviewDialog}
-                  aria-label="Application review"
-                  onCancel={(event) => {
-                    event.preventDefault();
-                    chooseApplication("");
-                  }}
-                >
-                  <section className="persistent-review" aria-label="Application review">
-                    <div className="review-header">
-                      <div>
-                        <h2>{selected.name}</h2>
-                        <p>
-                          {selected.source} · {selected.external_id ?? selected.filename}
-                        </p>
-                      </div>
-                      <div className="review-actions">
-                        <button className="button button-secondary" onClick={exportSelected}>
-                          <ArrowDownToLine size={14} />
-                          Export
-                        </button>
-                        <button
-                          className="icon-button"
-                          aria-label="Close application review"
-                          onClick={() => chooseApplication("")}
-                        >
-                          <X size={18} />
-                        </button>
-                      </div>
-                    </div>
-                    {selected.error && (
-                      <div className="application-error">
-                        <span>{selected.error}</span>
-                        <button
-                          className="text-button"
-                          onClick={() => void retry(`applications/${selected.id}/retry`)}
-                        >
-                          Retry application
-                        </button>
-                      </div>
-                    )}
-                    <div className="evidence-layout">
-                      <div className="findings-panel">
-                        <div className="table-label">
-                          <span>Requirement</span>
-                          <span>Finding</span>
-                        </div>
-                        {currentJob.requirements.map((requirement, index) => {
-                          const result = selected.assessment?.findings.find(
-                            (f) => f.requirement_id === requirement.id,
-                          );
-                          const resultStatus = overrides[requirement.id] ?? result?.status;
-                          return (
-                            <button
-                              key={requirement.id}
-                              className={`finding-row ${criterion === requirement.id ? "finding-selected" : ""}`}
-                              aria-pressed={criterion === requirement.id}
-                              onClick={() => setCriterion(requirement.id)}
-                            >
-                              <span className="requirement-index">{index + 1}</span>
-                              <span className="requirement-text">{requirement.text}</span>
-                              {resultStatus ? (
-                                <span
-                                  className={`status-badge status-${resultStatus.toLowerCase()}`}
-                                >
-                                  {STATUS_LABELS[resultStatus]}
-                                </span>
-                              ) : (
-                                <span className="not-assessed">{PIPELINE[selected.status]}</span>
-                              )}
-                              <ChevronRight size={12} />
-                            </button>
-                          );
-                        })}
-                        <p className="findings-footnote">
-                          Missing evidence is not proof of missing ability. Original findings are
-                          retained separately from corrections.
-                        </p>
-                      </div>
-                      <aside className="source-panel">
-                        <div className="source-heading">
-                          <FileText size={16} />
-                          <h3>Resume evidence</h3>
-                        </div>
-                        <div className="source-requirement">
-                          <span>Selected requirement</span>
-                          <p>{currentJob.requirements.find((r) => r.id === criterion)?.text}</p>
-                        </div>
-                        {["ocr", "mixed"].includes(selected.extraction_method ?? "") && (
-                          <p className="findings-footnote">
-                            OCR-derived text. Check transcription against the original document.
-                          </p>
-                        )}
-                        <pre className="resume-text">
-                          {sourceText ? (
-                            start < 0 ? (
-                              sourceText
-                            ) : (
-                              <>
-                                {sourceText.slice(0, start)}
-                                <mark>{evidence!.text}</mark>
-                                {sourceText.slice(start + evidence!.text.length)}
-                              </>
-                            )
-                          ) : (
-                            "The worker has not extracted text yet."
-                          )}
-                        </pre>
-                        {findingStatus && (
-                          <div className="correction">
-                            <label htmlFor="inbox-correction">Reviewer correction</label>
-                            <Select
-                              id="inbox-correction"
-                              value={findingStatus}
-                              onValueChange={(value) => {
-                                setOverrides((current) => ({
-                                  ...current,
-                                  [criterion]: value as EvidenceStatus,
-                                }));
-                                setDirty(true);
-                              }}
-                              options={Object.entries(STATUS_LABELS).map(([value, label]) => ({
-                                value,
-                                label,
-                              }))}
-                            />
-                          </div>
-                        )}
-                      </aside>
-                    </div>
-                    <div className="reviewer-notes">
-                      <label htmlFor="persistent-notes">Review notes</label>
-                      <textarea
-                        id="persistent-notes"
-                        value={notes}
-                        maxLength={2000}
-                        onChange={(event) => {
-                          setNotes(event.target.value);
-                          setDirty(true);
-                        }}
-                        placeholder="Record evidence gaps and follow-up questions…"
-                      />
-                      <div>
-                        <label className="review-checkbox">
-                          <input
-                            type="checkbox"
-                            checked={reviewed}
-                            onChange={(event) => {
-                              setReviewed(event.target.checked);
-                              setDirty(true);
-                            }}
-                          />
-                          Review complete
-                        </label>
-                        <button
-                          className="button button-primary"
-                          disabled={saving || !dirty}
-                          onClick={() => void saveReview()}
-                        >
-                          {saving ? (
-                            <LoaderCircle className="spin" size={14} />
-                          ) : (
-                            <Check size={14} />
-                          )}
-                          Save review
-                        </button>
-                      </div>
-                      <p className="review-save-state">
-                        {dirty ? "Unsaved changes" : "Review stored in the database"}
+            </div>
+            {selected && (
+              <dialog
+                className="application-drawer"
+                ref={reviewDialog}
+                aria-label="Application review"
+                onCancel={(event) => {
+                  event.preventDefault();
+                  chooseApplication("");
+                }}
+              >
+                <section className="persistent-review" aria-label="Application review">
+                  <div className="review-header">
+                    <div>
+                      <h2>{selected.name}</h2>
+                      <p>
+                        {selected.source} · {selected.external_id ?? selected.filename}
                       </p>
                     </div>
-                  </section>
-                </dialog>
-              )}
-              <details className="intake-details">
-                <summary>Integration and import details</summary>
-                <p>
-                  Job ID: <code>{jobId}</code>
+                    <div className="review-actions">
+                      <button className="button button-secondary" onClick={exportSelected}>
+                        <ArrowDownToLine size={14} />
+                        Export
+                      </button>
+                      <button
+                        className="icon-button"
+                        aria-label="Close application review"
+                        onClick={() => chooseApplication("")}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  </div>
+                  {selected.error && (
+                    <div className="application-error">
+                      <span>{selected.error}</span>
+                      <button
+                        className="text-button"
+                        onClick={() => void retry(`applications/${selected.id}/retry`)}
+                      >
+                        Retry application
+                      </button>
+                    </div>
+                  )}
+                  <div className="evidence-layout">
+                    <div className="findings-panel">
+                      <div className="table-label">
+                        <span>Requirement</span>
+                        <span>Finding</span>
+                      </div>
+                      {currentJob.requirements.map((requirement, index) => {
+                        const result = selected.assessment?.findings.find(
+                          (f) => f.requirement_id === requirement.id,
+                        );
+                        const resultStatus = overrides[requirement.id] ?? result?.status;
+                        return (
+                          <button
+                            key={requirement.id}
+                            className={`finding-row ${criterion === requirement.id ? "finding-selected" : ""}`}
+                            aria-pressed={criterion === requirement.id}
+                            onClick={() => setCriterion(requirement.id)}
+                          >
+                            <span className="requirement-index">{index + 1}</span>
+                            <span className="requirement-text">{requirement.text}</span>
+                            {resultStatus ? (
+                              <span className={`status-badge status-${resultStatus.toLowerCase()}`}>
+                                {STATUS_LABELS[resultStatus]}
+                              </span>
+                            ) : (
+                              <span className="not-assessed">{PIPELINE[selected.status]}</span>
+                            )}
+                            <ChevronRight size={12} />
+                          </button>
+                        );
+                      })}
+                      <p className="findings-footnote">
+                        Missing evidence is not proof of missing ability. Original findings are
+                        retained separately from corrections.
+                      </p>
+                    </div>
+                    <aside className="source-panel">
+                      <div className="source-heading">
+                        <FileText size={16} />
+                        <h3>Resume evidence</h3>
+                      </div>
+                      <div className="source-requirement">
+                        <span>Selected requirement</span>
+                        <p>{currentJob.requirements.find((r) => r.id === criterion)?.text}</p>
+                      </div>
+                      {["ocr", "mixed"].includes(selected.extraction_method ?? "") && (
+                        <p className="findings-footnote">
+                          OCR-derived text. Check transcription against the original document.
+                        </p>
+                      )}
+                      <pre className="resume-text">
+                        {sourceText ? (
+                          start < 0 ? (
+                            sourceText
+                          ) : (
+                            <>
+                              {sourceText.slice(0, start)}
+                              <mark>{evidence!.text}</mark>
+                              {sourceText.slice(start + evidence!.text.length)}
+                            </>
+                          )
+                        ) : (
+                          "The worker has not extracted text yet."
+                        )}
+                      </pre>
+                      {findingStatus && (
+                        <div className="correction">
+                          <label htmlFor="inbox-correction">Reviewer correction</label>
+                          <Select
+                            id="inbox-correction"
+                            value={findingStatus}
+                            onValueChange={(value) => {
+                              setOverrides((current) => ({
+                                ...current,
+                                [criterion]: value as EvidenceStatus,
+                              }));
+                              setDirty(true);
+                            }}
+                            options={Object.entries(STATUS_LABELS).map(([value, label]) => ({
+                              value,
+                              label,
+                            }))}
+                          />
+                        </div>
+                      )}
+                    </aside>
+                  </div>
+                  <div className="reviewer-notes">
+                    <label htmlFor="persistent-notes">Review notes</label>
+                    <textarea
+                      id="persistent-notes"
+                      value={notes}
+                      maxLength={2000}
+                      onChange={(event) => {
+                        setNotes(event.target.value);
+                        setDirty(true);
+                      }}
+                      placeholder="Record evidence gaps and follow-up questions…"
+                    />
+                    <div>
+                      <label className="review-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={reviewed}
+                          onChange={(event) => {
+                            setReviewed(event.target.checked);
+                            setDirty(true);
+                          }}
+                        />
+                        Review complete
+                      </label>
+                      <button
+                        className="button button-primary"
+                        disabled={saving || !dirty}
+                        onClick={() => void saveReview()}
+                      >
+                        {saving ? <LoaderCircle className="spin" size={14} /> : <Check size={14} />}
+                        Save review
+                      </button>
+                    </div>
+                    <p className="review-save-state">
+                      {dirty ? "Unsaved changes" : "Review stored in the database"}
+                    </p>
+                  </div>
+                </section>
+              </dialog>
+            )}
+            <details className="intake-details">
+              <summary>Integration and import details</summary>
+              <p>
+                Job ID: <code>{jobId}</code>
+              </p>
+              <p>
+                Applications can be submitted automatically using the authenticated intake API. See
+                the integration guide for file/text requests, delivery IDs, and a runnable
+                careers-form example.
+              </p>
+              {summary?.batches.map((batch) => (
+                <p key={batch.id}>
+                  Import {batch.id.slice(0, 8)}: {batch.received} / {batch.expected} received ·{" "}
+                  {batch.duplicates} duplicates
+                  {batch.received < batch.expected
+                    ? " · submission incomplete; accepted documents still process"
+                    : ""}
                 </p>
-                <p>
-                  Applications can be submitted automatically using the authenticated intake API.
-                  See the integration guide for file/text requests, delivery IDs, and a runnable
-                  careers-form example.
-                </p>
-                {summary?.batches.map((batch) => (
-                  <p key={batch.id}>
-                    Import {batch.id.slice(0, 8)}: {batch.received} / {batch.expected} received ·{" "}
-                    {batch.duplicates} duplicates
-                    {batch.received < batch.expected
-                      ? " · submission incomplete; accepted documents still process"
-                      : ""}
-                  </p>
-                ))}
-              </details>
-            </>
-          )}
-        </main>
-      </div>
+              ))}
+            </details>
+          </>
+        )}
+      </WorkspaceShell>
       <dialog
         ref={dialog}
         aria-labelledby="new-job-title"
@@ -1007,6 +1024,6 @@ export function JobInbox() {
           </button>
         </div>
       </dialog>
-    </div>
+    </>
   );
 }

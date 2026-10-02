@@ -9,8 +9,8 @@ test("inbox filter supports keyboard navigation, typeahead, cancellation, and em
     data: { title, requirements: [{ id: "python", text: "Built Python APIs" }] },
   });
   expect(response.status()).toBe(201);
-  await page.goto("/");
-  await page.getByRole("button", { name: title, exact: true }).click();
+  const job = await response.json();
+  await page.goto(`/?job=${job.id}`);
   const trigger = page.getByRole("combobox", { name: "Filter processing status" });
   await expect(trigger).toHaveText("All applications");
   await trigger.focus();
@@ -49,32 +49,28 @@ test("inbox filter supports keyboard navigation, typeahead, cancellation, and em
   await expect(page.getByText("No applications match these filters.")).toBeVisible();
 });
 
-test("sample workspace correction uses the same dropdown and changes the finding", async ({
-  page,
-}) => {
-  await page.goto("/demo");
-  const trigger = page.getByRole("combobox", { name: "Reviewer correction" });
-  await expect(trigger).toHaveText("Supported");
-  await trigger.click();
-  await expect(page.getByRole("option", { name: "Supported", exact: true })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  await page.getByRole("option", { name: "Needs clarification", exact: true }).click();
-  await expect(trigger).toHaveText("Needs clarification");
-  await expect(
-    page.getByRole("button", { name: /Built and maintained React applications/ }),
-  ).toContainText("Needs clarification");
-  await trigger.click();
+test("profile menu supports keyboard access and enters an isolated demo", async ({ page }) => {
+  await page.goto("/exports");
+  const trigger = page.getByRole("button", { name: "Workspace profile" });
+  await trigger.focus();
+  await trigger.press("Enter");
+  await expect(page.getByRole("menuitem", { name: "Open demo" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();
+  await trigger.press("Enter");
+  await page.getByRole("menuitem", { name: "Open demo" }).click();
+  await expect(page.locator(".demo-banner")).toBeVisible();
+  await page.getByRole("link", { name: "Back to workspace", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Exports", exact: true })).toBeVisible();
 });
 
 test("dropdown in the modal drawer stays visible, cancels independently, and saves a correction", async ({
   page,
 }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "Dropdown review fixture", exact: true }).click();
+  await page.goto("/jobs");
+  await page
+    .getByRole("button", { name: "Open resumes for Dropdown review fixture", exact: true })
+    .click();
   await page.getByRole("button", { name: /Dropdown Test Applicant/ }).click();
   const drawer = page.getByRole("dialog", { name: "Application review", exact: true });
   const trigger = page.getByRole("combobox", { name: "Reviewer correction" });
@@ -90,7 +86,6 @@ test("dropdown in the modal drawer stays visible, cancels independently, and sav
   await page.getByRole("button", { name: "Save review", exact: true }).click();
   await expect(page.getByText("Review saved.", { exact: true })).toBeVisible();
   await page.reload();
-  await page.getByRole("button", { name: "Dropdown review fixture", exact: true }).click();
   await page.getByRole("button", { name: /Dropdown Test Applicant/ }).click();
   await expect(page.getByRole("combobox", { name: "Reviewer correction" })).toHaveText(
     "Partial evidence",
@@ -103,11 +98,11 @@ test.describe("touch screens", () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   test("custom menus fit on mobile and can be selected by touch", async ({ page, request }) => {
     const title = `Mobile dropdown ${Date.now()}`;
-    await request.post("http://127.0.0.1:8010/api/v1/jobs", {
+    const response = await request.post("http://127.0.0.1:8010/api/v1/jobs", {
       data: { title, requirements: [{ id: "python", text: "Built Python APIs" }] },
     });
-    await page.goto("/");
-    await page.getByRole("button", { name: title, exact: true }).click();
+    const job = await response.json();
+    await page.goto(`/?job=${job.id}`);
     const trigger = page.getByRole("combobox", { name: "Filter processing status" });
     await trigger.tap();
     const menu = page.getByRole("listbox");

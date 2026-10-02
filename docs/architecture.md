@@ -54,9 +54,9 @@ A resume claim is not verified competence, and missing mentions are not proof of
 
 Pending/failed source bytes, extracted text, source IDs, original assessments, and reviewer data are stored in the database. Source bytes are cleared after successful extraction; failures retain bytes so parsing can be retried. Extracted text and review records persist. The Compose `database` volume therefore contains candidate information and must be protected, backed up, and governed by a retention policy. Deletion/retention administration is not implemented yet.
 
-PDFs are limited to twenty pages, DOCX unpacked content to 15 MB, and extracted text to 24,000 characters. Scanned/encrypted documents fail clearly; there is no OCR. Multipart uploads may spool to temporary disk before acceptance. Application logs exclude source text, credentials, and provider response bodies.
+PDFs are limited to twenty pages, DOCX unpacked content to 15 MB, and extracted text to 24,000 characters. Encrypted PDFs and documents with unusable extracted/OCR text fail clearly. Multipart uploads may spool to temporary disk before acceptance. Application logs exclude source text, credentials, and provider response bodies.
 
-Live inference sends passages and requirements to TypeSafe. Self-hosting the app does not imply local inference, residency guarantees, or control over the hosted provider's retention. Verify provider arrangements separately. Synthetic fixtures remain at `/demo` and are never automatically ingested into real jobs.
+Live inference sends passages and requirements to TypeSafe. Self-hosting the app does not imply local inference, residency guarantees, or control over the hosted provider's retention. Verify provider arrangements separately. The frontend-only workspace at `/demo` contains 200 fictional profiles and deterministic preset comparisons. It makes no backend or hosted inference calls. Demo selections reset on reload, and exports identify the sample provenance. Its folder and shortlist UI previews the planned cross-job workflow; real applications remain scoped to jobs.
 
 ## Current deployment boundary
 

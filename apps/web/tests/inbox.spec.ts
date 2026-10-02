@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 test("bulk intake processes documents, paginates, deduplicates, and saves a review", async ({
   page,
@@ -53,6 +54,18 @@ test("bulk intake processes documents, paginates, deduplicates, and saves a revi
     "Ask for a project example.",
   );
   await expect(page.getByLabel("Review complete", { exact: true })).toBeChecked();
+  await page.keyboard.press("Escape");
+  await page.getByRole("link", { name: "Exports", exact: true }).click();
+  await page.getByRole("combobox", { name: "Include applications" }).click();
+  await page.getByRole("option", { name: "All applications", exact: true }).click();
+  const downloading = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export reviews", exact: true }).click();
+  const csv = await readFile((await (await downloading).path())!, "utf8");
+  expect(csv).toContain('"Synthetic 000"');
+  expect(csv).toContain('"Synthetic 050"');
+  expect(csv).toContain('"Ask for a project example."');
+  expect(csv.match(/"Role","Candidate","Requirement"/g)).toHaveLength(1);
+  await expect(page.getByText("Exported 52 saved application reviews.")).toBeVisible();
 });
 
 test("external application arrives automatically and duplicate delivery returns its receipt", async ({
@@ -126,8 +139,10 @@ test("careers form submits a real file to authenticated intake and the worker pr
   const repeated = await request.post("http://127.0.0.1:9010/apply", { multipart });
   expect(first.status()).toBe(200);
   expect((await repeated.json()).receipt).toBe((await first.json()).receipt);
-  await page.goto("/");
-  await page.getByRole("button", { name: "Careers Form Example", exact: true }).click();
+  await page.goto("/jobs");
+  await page
+    .getByRole("button", { name: "Open resumes for Careers Form Example", exact: true })
+    .click();
   await page.getByRole("button", { name: /Careers Form Applicant/ }).click();
   await expect(page.locator(".persistent-review .resume-text")).toContainText(
     "operated PostgreSQL",
