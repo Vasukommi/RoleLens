@@ -26,6 +26,15 @@ class Requirement(BaseModel):
     )
     source_quote: str | None = Field(default=None, min_length=1, max_length=2000)
     review_note: str | None = Field(default=None, max_length=600)
+    components: list[str] = Field(default_factory=list, max_length=8)
+    component_operator: Literal["ALL", "ANY"] = "ALL"
+
+    @field_validator("components")
+    @classmethod
+    def bounded_components(cls, values):
+        if any(not 3 <= len(v) <= 300 for v in values):
+            raise ValueError("Components must be 3–300 characters each.")
+        return values
 
 
 class Passage(BaseModel):
@@ -60,12 +69,19 @@ class Finding(BaseModel):
     evidence: Passage | None = None
     confidence: float | None = Field(default=None, ge=0, le=1)
     probabilities: dict[str, float] | None = None
+    evidence_passages: list[Passage] = Field(default_factory=list, max_length=8)
+    components: list[dict] = Field(default_factory=list, max_length=8)
+    reason: str | None = None
+    method: str = "jev"
+    duration_months: int | None = None
 
 
 class Assessment(BaseModel):
     findings: list[Finding]
     model: str
     is_sample: bool = False
+    protocol: str = "legacy-single-passage"
+    assessed_at: str | None = None
 
 
 class ChoiceAnswer(BaseModel):

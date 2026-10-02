@@ -61,39 +61,37 @@ export function WorkspaceShell({
         </Link>
         <div className="workspace-caption">{demo ? "Example workspace" : "Hiring workspace"}</div>
         <nav className="workspace-navigation" aria-label="Main navigation">
-          {navigation
-            .filter((item) => demo || item.id !== "shortlists")
-            .map((item) => {
-              const content = (
-                <>
-                  <item.icon size={16} />
-                  <span>{item.label}</span>
-                </>
-              );
-              const className = `nav-item ${section === item.id ? "active" : ""}`;
-              return demo ? (
-                <button
-                  key={item.id}
-                  className={className}
-                  aria-current={section === item.id ? "page" : undefined}
-                  onClick={() => onNavigate?.(item.id)}
-                >
-                  {content}
-                </button>
-              ) : (
-                <Link
-                  key={item.id}
-                  className={className}
-                  aria-current={section === item.id ? "page" : undefined}
-                  href={`${item.href}${jobId ? `?job=${jobId}` : ""}`}
-                  onNavigate={(event) => {
-                    if (beforeNavigate && !beforeNavigate()) event.preventDefault();
-                  }}
-                >
-                  {content}
-                </Link>
-              );
-            })}
+          {navigation.map((item) => {
+            const content = (
+              <>
+                <item.icon size={16} />
+                <span>{item.label}</span>
+              </>
+            );
+            const className = `nav-item ${section === item.id ? "active" : ""}`;
+            return demo ? (
+              <button
+                key={item.id}
+                className={className}
+                aria-current={section === item.id ? "page" : undefined}
+                onClick={() => onNavigate?.(item.id)}
+              >
+                {content}
+              </button>
+            ) : (
+              <Link
+                key={item.id}
+                className={className}
+                aria-current={section === item.id ? "page" : undefined}
+                href={`${item.href}${jobId ? `?job=${jobId}` : ""}`}
+                onNavigate={(event) => {
+                  if (beforeNavigate && !beforeNavigate()) event.preventDefault();
+                }}
+              >
+                {content}
+              </Link>
+            );
+          })}
         </nav>
         <div className="sidebar-spacer" />
         <DropdownMenu.Root>

@@ -71,6 +71,33 @@ assessment = Assessment(model='synthetic-browser-fixture', is_sample=True, findi
 ])
 store.finish(row, 'READY', extraction_method='native',
              assessment=assessment.model_dump(mode='json'))
+from rolelens.matching import PROTOCOL
+job = store.create_job('Comparison fixture', [
+    {'id': 'react', 'text': 'React development', 'priority': 'REQUIRED'},
+    {'id': 'typescript', 'text': 'TypeScript development', 'priority': 'REQUIRED'},
+])
+for name, has_typescript in [('Alex Fixture', True), ('Sam Fixture', False)]:
+    text = 'Fictional resume. Built React applications.'
+    if has_typescript:
+        text += ' Implemented TypeScript components in a production project.'
+    receipt = store.accept(job['id'], name, name.replace(' ', '-') + '.txt',
+                           payload=text.encode(), source='synthetic_fixture')
+    row = store.claim(False, 90)
+    assert row['id'] == receipt['id']
+    assessment = Assessment(model='synthetic-browser-fixture', is_sample=True,
+        protocol=PROTOCOL, findings=[
+            Finding(requirement_id='react', status='SUPPORTED',
+                    evidence=Passage(id='p1', text=text),
+                    evidence_passages=[Passage(id='p1', text=text)],
+                    reason='Synthetic applied-work evidence.', confidence=0.9),
+            Finding(requirement_id='typescript',
+                    status='SUPPORTED' if has_typescript else 'NOT_MENTIONED',
+                    evidence=Passage(id='p1', text=text) if has_typescript else None,
+                    reason='Synthetic fixture result.'),
+        ])
+    store.finish(row, 'READY', text=text, extraction_method='native',
+                 payload=None, assessment=assessment.model_dump(mode='json'))
+
 """,
         ],
         env=environment,

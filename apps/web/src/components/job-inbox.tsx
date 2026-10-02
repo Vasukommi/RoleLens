@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { WorkspaceShell, type WorkspaceSection } from "@/components/workspace-shell";
+import { CandidateComparison } from "@/components/candidate-comparison";
 import { WorkspaceExports } from "@/components/workspace-exports";
 import type {
   Job,
@@ -192,7 +193,9 @@ export function JobInbox({ section = "library" }: { section?: WorkspaceSection }
     setPage(1);
     setSearch("");
     setStatus("");
-    router.push(`/?job=${id}`);
+    router.push(
+      `${section === "shortlists" ? "/shortlists" : section === "exports" ? "/exports" : "/"}?job=${id}`,
+    );
   }
 
   async function uploadPending(selection: UploadItem[], existingBatch = "") {
@@ -366,16 +369,20 @@ export function JobInbox({ section = "library" }: { section?: WorkspaceSection }
             <h1>
               {section === "jobs"
                 ? "Jobs"
-                : section === "exports"
-                  ? "Exports"
-                  : (currentJob?.title ?? "Resume library")}
+                : section === "shortlists"
+                  ? "Shortlists"
+                  : section === "exports"
+                    ? "Exports"
+                    : (currentJob?.title ?? "Resume library")}
             </h1>
             <p>
               {section === "jobs"
                 ? "Create roles and define the criteria used to assess incoming resumes."
-                : section === "exports"
-                  ? "Download saved application reviews and their supporting evidence."
-                  : "Import and inspect resumes for this job. PDF, DOCX, and TXT are supported."}
+                : section === "shortlists"
+                  ? "Automatic evidence matching, comparison, and approved shortlist exports."
+                  : section === "exports"
+                    ? "Download saved application reviews and their supporting evidence."
+                    : "Import and inspect resumes for this job. PDF, DOCX, and TXT are supported."}
             </p>
           </div>
           <div className="heading-actions">
@@ -390,6 +397,14 @@ export function JobInbox({ section = "library" }: { section?: WorkspaceSection }
               >
                 <Plus size={16} />
                 New job
+              </button>
+            )}
+            {section === "library" && jobId && (
+              <button
+                className="button button-secondary"
+                onClick={() => router.push(`/shortlists?job=${jobId}`)}
+              >
+                View matching results
               </button>
             )}
             {section === "library" && (
@@ -518,6 +533,15 @@ export function JobInbox({ section = "library" }: { section?: WorkspaceSection }
               <button className="button button-primary" onClick={() => setCreating(true)}>
                 Create job
               </button>
+            </section>
+          )
+        ) : section === "shortlists" ? (
+          currentJob ? (
+            <CandidateComparison key={currentJob.id} job={currentJob} />
+          ) : (
+            <section className="empty-review">
+              <h2>Create a job to compare resumes</h2>
+              <p>Create a job and import resumes. Matching runs automatically.</p>
             </section>
           )
         ) : section === "exports" ? (

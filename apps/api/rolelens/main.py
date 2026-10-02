@@ -14,12 +14,14 @@ from rolelens.middleware import IntakeBodyLimit
 from rolelens.providers import AssessmentProvider, JevProvider, ProviderError
 from rolelens.sample import sample_workspace
 from rolelens.schemas import Assessment, AssessmentRequest, ParsedResume
+from rolelens.screening import router as screening_router
 from rolelens.storage import IntakeConflict
 
 app = FastAPI(title="RoleLens API", version="0.1.0")
 app.add_middleware(IntakeBodyLimit)
 app.include_router(router)
 app.include_router(description_router)
+app.include_router(screening_router)
 
 
 @app.exception_handler(IntakeConflict)

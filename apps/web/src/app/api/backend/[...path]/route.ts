@@ -21,6 +21,11 @@ const INBOX_ROUTES = [
   { path: new RegExp(`^applications/${ID}$`), methods: ["GET"] },
   { path: new RegExp(`^applications/${ID}/review$`), methods: ["PATCH"] },
   { path: new RegExp(`^applications/${ID}/retry$`), methods: ["POST"] },
+  { path: new RegExp(`^jobs/${ID}/comparison$`), methods: ["GET"] },
+  { path: new RegExp(`^jobs/${ID}/shortlist$`), methods: ["POST"] },
+  { path: new RegExp(`^jobs/${ID}/reassess$`), methods: ["POST"] },
+  { path: new RegExp(`^jobs/${ID}/shortlist/documents$`), methods: ["GET"] },
+  { path: new RegExp(`^applications/${ID}/document$`), methods: ["GET"] },
 ];
 
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
@@ -32,8 +37,10 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   if (!allowed) {
     return NextResponse.json({ detail: "Endpoint not found." }, { status: 404 });
   }
-  const analyzingDescription = route === "job-interpretations";
-  if (analyzingDescription) {
+  const protectedWorkspaceRequest =
+    route === "job-interpretations" ||
+    /\/(?:comparison|shortlist|reassess|document|shortlist\/documents)$/.test(route);
+  if (protectedWorkspaceRequest) {
     const origin = request.headers.get("origin");
     // Next.js can normalize nextUrl.hostname to localhost in development. Compare the
     // browser's actual authority to Host, while still checking the scheme and fetch metadata.
@@ -50,13 +57,16 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     }
     if (request.headers.get("sec-fetch-site") === "cross-site" || !sameOrigin) {
       return NextResponse.json(
-        { detail: "Cross-origin analysis is not allowed." },
+        { detail: "Cross-origin workspace requests are not allowed." },
         { status: 403 },
       );
     }
     if (!process.env.WORKSPACE_API_KEY) {
       return NextResponse.json(
-        { detail: "Configure WORKSPACE_API_KEY on the web and API servers to enable analysis." },
+        {
+          detail:
+            "Configure WORKSPACE_API_KEY on the web and API servers to enable analysis and matching results.",
+        },
         { status: 503 },
       );
     }
@@ -91,7 +101,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   try {
     const base = process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
     const query = new URLSearchParams();
-    for (const key of ["page", "search", "status"]) {
+    for (const key of ["page", "search", "status", "scope", "criterion_id", "finding_status"]) {
       const value = request.nextUrl.searchParams.get(key);
       if (value !== null) query.set(key, value);
     }
@@ -101,7 +111,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
         ...(body
           ? { "Content-Type": request.headers.get("content-type") ?? "application/json" }
           : {}),
-        ...(analyzingDescription
+        ...(protectedWorkspaceRequest
           ? { Authorization: `Bearer ${process.env.WORKSPACE_API_KEY}` }
           : {}),
       },
@@ -109,9 +119,16 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       cache: "no-store",
       signal: AbortSignal.timeout(120_000),
     });
+    const responseHeaders: Record<string, string> = {
+      "Content-Type": response.headers.get("content-type") ?? "application/json",
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+    };
+    const disposition = response.headers.get("content-disposition");
+    if (disposition) responseHeaders["Content-Disposition"] = disposition;
     return new NextResponse(response.body, {
       status: response.status,
-      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+      headers: responseHeaders,
     });
   } catch {
     return NextResponse.json(

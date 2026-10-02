@@ -94,7 +94,11 @@ def create_job(request: NewJob, store: Database):
             raise HTTPException(422, "The criterion does not belong to this interpretation.")
         item["source_quote"] = original["source_quote"]
         item["review_note"] = original["review_note"]
+        item["components"] = original.get("components", [])
+        item["component_operator"] = original.get("component_operator", "ALL")
         text_changed = item["text"] != original["text"]
+        if text_changed:
+            item["components"] = []
         if text_changed or item["priority"] != original["priority"]:
             edits.append(item["id"])
             item["review_note"] = (

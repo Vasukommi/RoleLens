@@ -6,17 +6,17 @@
 
 # RoleLens
 
-Self-hostable resume evidence review with automated application intake.
+Self-hostable resume evidence matching with automated application intake and approved shortlist exports.
 
 [![RoleLens demo workspace — fictional profiles and preset results](docs/images/demo-workspace.png)](docs/demo.md)
 
 [Explore the demo workspace](docs/demo.md). The screenshot shows fictional profiles and preset results, not live Jev screening.
 
-Create a job once, receive applications from an external source or import many resumes together, and let a separate worker extract text and assess explicit role requirements. Reviewers inspect source evidence, correct findings, save notes, and export a review. RoleLens does not rank applicants or make hiring decisions.
+Create a job once, receive applications from an external source or import many resumes together, and let a separate worker extract text and assess explicit role requirements. Open matching results to compare required/preferred evidence, filter individual criteria, approve a shortlist, and export its CSV and original resumes. Reviewers can inspect source evidence and correct findings. RoleLens does not rank applicants or make hiring decisions.
 
 ## Current capabilities
 
-- Dedicated Jobs, Resume library, and Exports navigation, with a workspace profile menu.
+- Dedicated Jobs, Resume library, Shortlists, and Exports navigation, with a workspace profile menu.
 - An isolated demo with 200 fictional profiles, folders, example jobs, and preset shortlist comparisons; no API or Jev key required.
 - Persistent jobs, applications, processing status, and reviewer work.
 - Paste an ordinary JD, review source-linked criteria and priorities, then save a fixed job definition. OpenAI interprets descriptions; Jev verifies interpretations and assesses resume evidence.
@@ -26,6 +26,8 @@ Create a job once, receive applications from an external source or import many r
 - A database-backed worker with expiring leases, restart recovery, provider backoff, and bounded retry attempts.
 - Local English OCR for scanned PDFs, with extraction provenance shown to reviewers.
 - Server-side search, status filters, and 50-row pagination; resume text loads only when selected.
+- [Automatic multi-passage matching](docs/automated-matching.md), ALL/ANY skill components, and conservative dated employment calculations.
+- Versioned shortlist approval, criterion filters, approved CSV exports, and original resume ZIP downloads.
 - Original model findings stored separately from reviewer corrections, with stale-write protection.
 - CSV exports for one review, all reviewed applications, or all applications in a job.
 - PostgreSQL and migrations in Compose; SQLite for local development.
@@ -34,7 +36,7 @@ Create a job once, receive applications from an external source or import many r
 
 This is an active **local development preview**, not a completed enterprise deployment. The programmatic intake API has its own bearer token; the human reviewer UI has no login, workspace permissions, or tenant isolation. Keep the deployment on localhost or a trusted isolated development network. Shared/public use requires those controls, retention administration, and operational validation.
 
-Real job records persist across refreshes and restarts. The [demo workspace](http://localhost:3000/demo) is separate, uses fictional presets, and resets on reload. Open it from the workspace profile menu and return using its banner. Folder-based matching and proposed shortlists are currently demo previews; real imports remain scoped to a job. Review the [data handling and queue guarantees](docs/architecture.md) before importing candidate information. Hosted assessment sends passages and requirements to TypeSafe.
+Real job records persist across refreshes and restarts. The [demo workspace](http://localhost:3000/demo) is separate, uses fictional presets, and resets on reload. Open it from the workspace profile menu and return using its banner. Reusable folders remain demo previews; live matching, comparison, and approved shortlist exports operate on real imports scoped to a job. Review the [data handling and queue guarantees](docs/architecture.md) before importing candidate information. Hosted assessment sends passages and requirements to TypeSafe.
 
 ## Run locally
 
@@ -69,7 +71,7 @@ Frontend terminal, from the root:
 npm run dev
 ```
 
-Open [localhost:3000](http://localhost:3000). Create a job, paste its description, and review the extracted criteria. Alternatively, choose **Enter criteria manually** without OpenAI. Then select multiple PDF/DOCX/TXT files with **Import resumes**. Accepted applications are durable; keep the tab open until all file uploads complete. Parsed documents wait for provider configuration when no Jev key exists. API documentation: [localhost:8000/docs](http://localhost:8000/docs).
+Open [localhost:3000](http://localhost:3000). Create a job, paste its description, and review the extracted criteria. Alternatively, choose **Enter criteria manually** without OpenAI. Then select multiple PDF/DOCX/TXT files with **Import resumes**. Accepted applications are durable; keep the tab open until all file uploads complete. Parsed documents wait for provider configuration when no Jev key exists. Open **View matching results** or **Shortlists** once assessment completes. Filter the automatic findings, review a selection, and approve it before downloading the shortlist. API documentation: [localhost:8000/docs](http://localhost:8000/docs).
 
 For scanned PDFs, install Tesseract with English language data (`brew install tesseract` on supported macOS setups, or `sudo apt-get install tesseract-ocr tesseract-ocr-eng` on Debian/Ubuntu). Compose includes it. Text PDFs, DOCX, and TXT do not need the OCR binary. OCR-derived text can contain transcription errors; reviewers should check the original source document.
 
@@ -121,7 +123,7 @@ uv run pytest
 uv run alembic check
 ```
 
-CI repeats intake tests against PostgreSQL, checks container startup, and runs `scripts/check_intake.py` to deliver and process 1,000 synthetic text applications through the actual API and worker with Jev disabled. The 1,000-application test verifies persistence, pagination, and metadata retrieval; it is not a production capacity or live-model accuracy benchmark. Provider tests mock responses. No live Jev quality or throughput evaluation has been published.
+CI repeats intake and comparison tests against PostgreSQL, checks container startup, and runs `scripts/check_intake.py` to deliver and process 1,000 synthetic text applications through the actual API and worker with Jev disabled. The 1,000-application test verifies persistence, pagination, and metadata retrieval; it is not a production capacity or live-model accuracy benchmark. Provider tests mock responses. No live Jev quality or throughput evaluation has been published.
 
 ## Contributing
 

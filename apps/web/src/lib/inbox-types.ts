@@ -4,6 +4,8 @@ export type JobRequirement = {
   text: string;
   priority?: "REQUIRED" | "PREFERRED" | "UNSPECIFIED";
   assessment_mode?: "RESUME_EVIDENCE" | "VERIFY_SEPARATELY" | "INTERVIEW";
+  components?: string[];
+  component_operator?: "ALL" | "ANY";
   source_quote?: string | null;
   review_note?: string | null;
 };
@@ -25,6 +27,8 @@ export type Job = {
   interpretation?: JobInterpretation | null;
 };
 export type Application = {
+  document_available?: boolean;
+  shortlisted?: boolean;
   id: string;
   job_id: string;
   name: string;

@@ -52,6 +52,10 @@ EXTRACTED = {
 }
 
 
+for criterion in EXTRACTED["criteria"]:
+    criterion.update(components=[], component_operator="ALL")
+
+
 def settings(**overrides):
     return Settings(
         _env_file=None,
@@ -341,15 +345,19 @@ def test_authentication_cache_and_immutable_job_snapshot(client):
     assert client.post("/api/v1/jobs", json=payload).status_code == 422
     payload["interpretation_reviewed"] = True
     payload["requirements"][0]["source_quote"] = "forged quote"
+    payload["requirements"][0]["components"] = ["Forged Python experience"]
+    payload["requirements"][0]["component_operator"] = "ANY"
     payload["requirements"][2]["assessment_mode"] = "RESUME_EVIDENCE"
     job = client.post("/api/v1/jobs", json=payload)
     assert job.status_code == 201
     data = store.job(job.json()["id"])
     assert data["description"] == DESCRIPTION
+    assert data["requirements"][0]["components"] == []
+    assert data["requirements"][0]["component_operator"] == "ALL"
     assert data["requirements"][0]["source_quote"] == EXTRACTED["criteria"][0]["source_quote"]
     assert data["requirements"][1]["assessment_mode"] == "VERIFY_SEPARATELY"
     assert data["requirements"][2]["assessment_mode"] == "VERIFY_SEPARATELY"
-    assert data["interpretation"]["prompt_version"] == "jd-interpretation-v5"
+    assert data["interpretation"]["prompt_version"] == "jd-interpretation-v6"
     assert (
         store.interpretation(first.json()["id"])["result"]["requirements"][1]["assessment_mode"]
         == "RESUME_EVIDENCE"
