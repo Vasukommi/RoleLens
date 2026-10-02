@@ -20,13 +20,6 @@ export type Candidate = {
   reviewed?: boolean;
   notes?: string;
 };
-export type Workspace = {
-  role_title: string;
-  requirements: Requirement[];
-  candidates: Candidate[];
-};
-export type Health = { status: string; assessment_available: boolean; model: string | null };
-
 export const STATUS_LABELS: Record<EvidenceStatus, string> = {
   SUPPORTED: "Supported",
   PARTIAL: "Partial evidence",

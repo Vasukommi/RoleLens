@@ -8,14 +8,16 @@
 
 Self-hostable resume evidence review with automated application intake.
 
-[![Watch the short RoleLens demo](docs/demo-assets/cover.png)](docs/demo-assets/rolelens-demo-short.mp4)
+[![RoleLens demo workspace — fictional profiles and preset results](docs/images/demo-workspace.png)](docs/demo.md)
 
-[Download the short demo](docs/demo-assets/rolelens-demo-short.mp4) · [Try the sample workflow](docs/demo.md)
+[Explore the demo workspace](docs/demo.md). The screenshot shows fictional profiles and preset results, not live Jev screening.
 
 Create a job once, receive applications from an external source or import many resumes together, and let a separate worker extract text and assess explicit role requirements. Reviewers inspect source evidence, correct findings, save notes, and export a review. RoleLens does not rank applicants or make hiring decisions.
 
 ## Current capabilities
 
+- Dedicated Jobs, Resume library, and Exports navigation, with a workspace profile menu.
+- An isolated demo with 200 fictional profiles, folders, example jobs, and preset shortlist comparisons; no API or Jev key required.
 - Persistent jobs, applications, processing status, and reviewer work.
 - Bulk file selection with three concurrent uploads, individual errors, safe retry receipts, and duplicate detection.
 - An authenticated text/file intake API with source IDs and status receipts.
@@ -24,15 +26,14 @@ Create a job once, receive applications from an external source or import many r
 - Local English OCR for scanned PDFs, with extraction provenance shown to reviewers.
 - Server-side search, status filters, and 50-row pagination; resume text loads only when selected.
 - Original model findings stored separately from reviewer corrections, with stale-write protection.
+- CSV exports for one review, all reviewed applications, or all applications in a job.
 - PostgreSQL and migrations in Compose; SQLite for local development.
-
-![RoleLens synthetic intake workload](docs/images/inbox.png)
 
 ## Deployment status
 
 This is an active **local development preview**, not a completed enterprise deployment. The programmatic intake API has its own bearer token; the human reviewer UI has no login, workspace permissions, or tenant isolation. Keep the deployment on localhost or a trusted isolated development network. Shared/public use requires those controls, retention administration, and operational validation.
 
-Real job records persist across refreshes and restarts. The [synthetic demo](http://localhost:3000/demo) is separate and remains session-only. Review the [data handling and queue guarantees](docs/architecture.md) before importing candidate information. Hosted assessment sends passages and requirements to TypeSafe.
+Real job records persist across refreshes and restarts. The [demo workspace](http://localhost:3000/demo) is separate, uses fictional presets, and resets on reload. Open it from the workspace profile menu and return using its banner. Folder-based matching and proposed shortlists are currently demo previews; real imports remain scoped to a job. Review the [data handling and queue guarantees](docs/architecture.md) before importing candidate information. Hosted assessment sends passages and requirements to TypeSafe.
 
 ## Run locally
 
@@ -71,7 +72,7 @@ Open [localhost:3000](http://localhost:3000). Create a job, enter explicit requi
 
 For scanned PDFs, install Tesseract with English language data (`brew install tesseract` on supported macOS setups, or `sudo apt-get install tesseract-ocr tesseract-ocr-eng` on Debian/Ubuntu). Compose includes it. Text PDFs, DOCX, and TXT do not need the OCR binary. OCR-derived text can contain transcription errors; reviewers should check the original source document.
 
-See the [sample walkthrough](docs/demo.md) to try a fictional resume and inspect the product workflow.
+See the [demo walkthrough](docs/demo.md) to explore example folders, jobs, comparison results, and exports. The recorded video above shows the earlier intake/review interface.
 
 ## Configuration
 
